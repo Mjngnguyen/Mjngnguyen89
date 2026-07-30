@@ -115,8 +115,12 @@
     border-radius: 4px;
     background: rgba(2,18,10,0.6);
     border: 1px solid currentColor;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.15s ease;
+    pointer-events: auto;
+    cursor: pointer;
   }
+  .flow-hero-label:hover { transform: translate(-50%, -100%) scale(1.12); }
+  .flow-hero-label.is-pinned { box-shadow: 0 0 10px currentColor; }
 
   /* ===== top movers panel — own corner, doesn't compete with the logo/wave focal point ===== */
   .flow-hero-trending {
@@ -130,7 +134,7 @@
     border-radius: 10px;
     padding: 16px 20px;
     min-width: 300px;
-    pointer-events: none;
+    pointer-events: auto;
   }
   .fht-title {
     font-size: 11px;
@@ -156,7 +160,9 @@
     gap: 5px;
     font-size: 13px;
   }
-  .fht-row { display: flex; justify-content: space-between; gap: 16px; }
+  .fht-row { display: flex; justify-content: space-between; gap: 16px; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; transition: background 0.15s ease; }
+  .fht-row:hover { background: rgba(122,255,191,0.12); }
+  .fht-row.is-pinned { background: rgba(122,255,191,0.2); }
   .fht-row .sym { color: var(--ink, #E9E8E5); font-weight: 700; }
 
   /* ===== top bar ===== */
@@ -802,11 +808,40 @@ void main(){ vec2 p = gl_PointCoord - 0.5; float l = length(p); if (l > 0.5) dis
 
 /* ===== market mood — BTC 24h change still drives overall swell intensity ===== */
 let currentWaveHeight = waveHeight;
+let pinnedCoinId = null;
+function fmtCoinPrice(p) {
+  if (p == null) return '--';
+  if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (p >= 1) return '$' + p.toFixed(4);
+  return '$' + p.toFixed(6);
+}
+function findCoin(id) { return latestCoins.find(c => c.id === id); }
+// Renders the pinned coin's price into the ticker if one is pinned; returns whether it did.
+function renderPinnedTicker() {
+  if (!pinnedCoinId) return false;
+  const c = findCoin(pinnedCoinId);
+  if (!c) return false;
+  const chg = c.price_change_percentage_24h_in_currency ?? c.price_change_percentage_24h ?? 0;
+  const sign = chg >= 0 ? '+' : '';
+  heroTickerEl.textContent = `${c.symbol.toUpperCase()} ${fmtCoinPrice(c.current_price)}  ${sign}${chg.toFixed(2)}%  · bấm lại để bỏ ghim`;
+  heroTickerEl.style.color = chg >= 0 ? '#7CFFB2' : '#FF8A80';
+  return true;
+}
+function togglePin(id) {
+  pinnedCoinId = (pinnedCoinId === id) ? null : id;
+  refreshPinnedHighlight();
+  if (!renderPinnedTicker()) applyMood();
+}
+function refreshPinnedHighlight() {
+  labelEls.forEach(el => el.classList.toggle('is-pinned', !!pinnedCoinId && el.dataset.coinId === pinnedCoinId));
+  document.querySelectorAll('.fht-row').forEach(row => row.classList.toggle('is-pinned', !!pinnedCoinId && row.dataset.coinId === pinnedCoinId));
+}
 function applyMood() {
   const m = window.__marketMood || {};
   const chg = m.chg24h ?? 0;
   const turb = clamp(Math.abs(chg) / 8, 0, 1);
   currentWaveHeight = waveHeight * (1 + turb * 0.8);
+  if (renderPinnedTicker()) return;
   if (heroTickerEl && m.price != null) {
     const sign = chg >= 0 ? '+' : '';
     heroTickerEl.textContent = `BTC $${m.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}  ${sign}${chg.toFixed(2)}%`;
@@ -846,23 +881,33 @@ setInterval(fetchTop100Coins, 300000);
 
 /* ===== fixed coin-name labels on the ~10 biggest wave lanes (nearest camera) ===== */
 const LABEL_COUNT = 10;
+const STABLECOIN_SYMBOLS = new Set(['USDT','USDC','DAI','BUSD','TUSD','USDD','FDUSD','PYUSD','USDE','GUSD','USDP','FRAX','LUSD','SUSD','USTC','EURT','EURS']);
+let labelCoins = [];
+function computeLabelCoins() {
+  // Skip stablecoins for the fixed labels — they sit near $0 change and waste a label slot.
+  labelCoins = latestCoins.filter(c => !STABLECOIN_SYMBOLS.has(c.symbol.toUpperCase())).slice(0, LABEL_COUNT);
+}
 const labelEls = [];
 for (let i = 0; i < LABEL_COUNT; i++) {
   const el = document.createElement('div');
   el.className = 'flow-hero-label';
   el.style.display = 'none';
+  el.addEventListener('click', () => togglePin(el.dataset.coinId));
   heroLabelsEl.appendChild(el);
   labelEls.push(el);
 }
 function updateLabelContent() {
+  computeLabelCoins();
   for (let i = 0; i < LABEL_COUNT; i++) {
-    const coin = latestCoins[i];
+    const coin = labelCoins[i];
     const el = labelEls[i];
-    if (!coin) { el.style.display = 'none'; continue; }
+    if (!coin) { el.style.display = 'none'; el.dataset.coinId = ''; continue; }
     const chg = coin.price_change_percentage_24h_in_currency ?? coin.price_change_percentage_24h ?? 0;
     el.textContent = coin.symbol.toUpperCase();
     el.style.color = chg >= 0 ? '#7CFFB2' : '#FF8A80';
+    el.dataset.coinId = coin.id;
   }
+  refreshPinnedHighlight();
 }
 // Anchor point for band/theta on the flattened sheet (see pointsVertexShader: wp.x = x*13 + y*6,
 // wp.z = z*25). band picks the depth (z), theta picks WHERE on that latitude ring (x,y) —
@@ -881,7 +926,7 @@ const GOLDEN_ANGLE = 2.399963; // spreads labels laterally without clustering
 function updateLabelPositions() {
   for (let i = 0; i < LABEL_COUNT; i++) {
     const el = labelEls[i];
-    if (!latestCoins[i]) continue;
+    if (!labelCoins[i]) continue;
     // Sample only the sub-range of the sheet that stays comfortably in view (not squeezed to
     // the horizon, not behind the camera), so labels spread across near + far, not just far.
     const t = LABEL_COUNT > 1 ? i / (LABEL_COUNT - 1) : 0.5;
@@ -905,23 +950,32 @@ const TREND_FIELDS = [
   { key: '7d',  field: 'price_change_percentage_7d_in_currency',  label: '7D' }
 ];
 let trendIdx = 0;
+const TRENDING_POOL_SIZE = 50; // giới hạn top-50 vốn hoá để tránh token quá nhỏ/lạ, khó nhận diện
 function trendRow(c, field) {
   const chg = c[field];
   const cls = chg >= 0 ? '#7CFFB2' : '#FF8A80';
-  return `<div class="fht-row"><span class="sym">${c.symbol.toUpperCase()}</span><span style="color:${cls}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div>`;
+  return `<div class="fht-row" data-coin-id="${c.id}"><span class="sym">${c.symbol.toUpperCase()}</span><span style="color:${cls}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div>`;
 }
 function renderTrendingPanel() {
   if (!latestCoins.length) return;
   const tf = TREND_FIELDS[trendIdx];
   fhtTitleEl.textContent = `TOP BIẾN ĐỘNG · ${tf.label}`;
-  const valid = latestCoins.filter(c => typeof c[tf.field] === 'number');
+  const pool = latestCoins.slice(0, TRENDING_POOL_SIZE);
+  const valid = pool.filter(c => typeof c[tf.field] === 'number');
   const gainers = [...valid].sort((a, b) => b[tf.field] - a[tf.field]).slice(0, 5);
   const losers = [...valid].sort((a, b) => a[tf.field] - b[tf.field]).slice(0, 5);
   fhtListUpEl.innerHTML = gainers.map(c => trendRow(c, tf.field)).join('');
   fhtListDownEl.innerHTML = losers.map(c => trendRow(c, tf.field)).join('');
+  refreshPinnedHighlight();
 }
 // 7s/khung — đủ thời gian đọc 5 dòng trước khi chuyển sang khung thời gian tiếp theo
 setInterval(() => { trendIdx = (trendIdx + 1) % TREND_FIELDS.length; renderTrendingPanel(); }, 7000);
+function handleTrendClick(e) {
+  const row = e.target.closest('.fht-row');
+  if (row) togglePin(row.dataset.coinId);
+}
+fhtListUpEl.addEventListener('click', handleTrendClick);
+fhtListDownEl.addEventListener('click', handleTrendClick);
 
 /* ===== scroll (relative to the hero's own spacer, not the whole page) ===== */
 let scrollTarget = 0, scrollSmooth = 0, scrollCurrent = 0;
