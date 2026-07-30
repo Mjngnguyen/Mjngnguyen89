@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRICE ALERT × SENTINEL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#0F1012; --card:#16171B; --ink:#E9E8E5; --dim:#8B8D93; --dim2:#5B5D63;
+    --line:#26272C; --line-soft:#1D1E22;
+    --green:#4ADE80; --green-bg:rgba(74,222,128,0.10);
+    --red:#F87171; --red-bg:rgba(248,113,113,0.10);
+    --amber:#FBBF24; --amber-bg:rgba(251,191,36,0.10);
+    --blue:#3B9BE8; --blue-bg:rgba(59,155,232,0.10);
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scrollbar-color: var(--line) var(--paper); }
+  body { background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:12.5px; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 16px 32px; }
+  a { color:inherit; }
+  .up { color:var(--green); } .down { color:var(--red); }
+
+  header { display:flex; align-items:center; justify-content:space-between; padding:18px 0 14px; }
+  .brand { font-weight:800; font-size:14px; letter-spacing:0.5px; display:flex; align-items:center; gap:8px; }
+  .brand .sub { color:var(--dim); font-weight:400; font-size:11px; }
+  .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 1.4s infinite; }
+  @keyframes pulse { 50%{opacity:0.3;} }
+  .head-right { display:flex; align-items:center; gap:10px; }
+  .clock { color:var(--dim); font-size:11px; font-variant-numeric:tabular-nums; }
+  .src-chip { font-size:9.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--line); color:var(--dim); letter-spacing:0.4px; }
+  .src-chip b { color:var(--ink); }
+  .icon-btn {
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    background:var(--card); border:1px solid var(--line); border-radius:8px; cursor:pointer;
+    color:var(--dim); font-size:14px; transition:border-color .15s, color .15s;
+  }
+  .icon-btn:hover { color:var(--ink); border-color:var(--dim2); }
+  .nav-link { color:var(--dim); text-decoration:none; font-size:10px; letter-spacing:0.8px; border:1px solid var(--line); padding:3px 8px; border-radius:3px; transition:color 0.15s,border-color 0.15s; }
+  .nav-link:hover { color:var(--ink); border-color:var(--dim2); }
+
+  @keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes popScale { 0%{transform:scale(1);} 50%{transform:scale(1.015);} 100%{transform:scale(1);} }
+  @media (prefers-reduced-motion: no-preference) {
+    .wcard { animation: fadeInUp .45s ease both; }
+    .wcard:nth-child(1){animation-delay:.02s;} .wcard:nth-child(2){animation-delay:.06s;}
+    .wcard:nth-child(3){animation-delay:.10s;} .wcard:nth-child(4){animation-delay:.14s;}
+    .wcard:nth-child(5){animation-delay:.18s;} .wcard:nth-child(n+6){animation-delay:.22s;}
+    .alert-row { animation: fadeInUp .35s ease both; }
+    .price.pop { animation: popScale .35s ease; }
+  }
+  .rank-badge { font-size:8.5px; color:var(--dim); font-weight:600; letter-spacing:0.3px; margin-top:1px; }
+  .server-ok { border-color:var(--green); color:var(--green); }
+  .server-err { border-color:var(--red); color:var(--red); cursor:help; }
+
+  .section-label { font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; margin:20px 0 10px; display:flex; align-items:center; justify-content:space-between; }
+  .add-coin-form { display:flex; gap:6px; }
+  .add-coin-form input {
+    font-family:var(--mono); background:var(--card); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:5px 9px; font-size:10.5px; width:80px; text-transform:uppercase;
+  }
+  .add-coin-form button {
+    font-family:var(--mono); background:var(--card); color:var(--dim); border:1px solid var(--line);
+    border-radius:6px; padding:5px 10px; font-size:10.5px; cursor:pointer;
+  }
+  .add-coin-form button:hover { color:var(--ink); border-color:var(--dim2); }
+
+  .watchlist { display:grid; grid-template-columns:repeat(auto-fill, minmax(178px,1fr)); gap:10px; }
+  .wcard { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; position:relative; overflow:hidden; transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  .wcard:hover { transform:translateY(-2px); border-color:var(--dim2); box-shadow:0 6px 18px rgba(0,0,0,0.28); }
+  .wcard .sym-row { display:flex; align-items:center; justify-content:space-between; }
+  .wcard .sym { font-weight:800; font-size:13px; }
+  .wcard .rm { color:var(--dim2); cursor:pointer; font-size:12px; padding:2px; }
+  .wcard .rm:hover { color:var(--red); }
+  .wcard .price { font-size:19px; font-weight:800; margin-top:8px; letter-spacing:-0.3px; transition:color .3s; }
+  .wcard .chg { font-size:10.5px; font-weight:700; margin-top:2px; }
+  .wcard .spark { width:100%; height:36px; margin-top:8px; display:block; }
+  .wcard .quick-add {
+    margin-top:10px; width:100%; background:transparent; border:1px dashed var(--line); color:var(--dim);
+    font-family:var(--mono); font-size:9.5px; padding:5px 0; border-radius:6px; cursor:pointer; letter-spacing:0.5px;
+  }
+  .wcard .quick-add:hover { color:var(--ink); border-color:var(--dim2); }
+  .wcard .quick-form { display:none; margin-top:8px; gap:5px; flex-direction:column; }
+  .wcard .quick-form.open { display:flex; }
+  .quick-form select, .quick-form input {
+    font-family:var(--mono); background:var(--paper); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:5px 7px; font-size:10px; width:100%;
+  }
+  .quick-form .qf-row { display:flex; gap:5px; }
+  .quick-form .qf-row button {
+    font-family:var(--mono); background:var(--ink); color:var(--paper); border:none; border-radius:6px;
+    padding:5px 9px; font-size:9.5px; font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+  .qf-type-tabs { display:flex; gap:4px; }
+  .qf-type-tabs button {
+    flex:1; font-family:var(--mono); background:var(--paper); color:var(--dim); border:1px solid var(--line);
+    border-radius:6px; padding:4px 0; font-size:9px; cursor:pointer; letter-spacing:0.3px;
+  }
+  .qf-type-tabs button.active { background:var(--ink); color:var(--card); border-color:var(--ink); font-weight:700; }
+  .qf-indicator-fields { display:none; flex-direction:column; gap:5px; }
+  .qf-indicator-fields.show { display:flex; }
+  .qf-price-fields { display:flex; flex-direction:column; gap:5px; }
+  .qf-price-fields.hide { display:none; }
+
+  .cols { display:grid; grid-template-columns:1fr 260px; gap:16px; align-items:start; margin-top:6px; }
+  @media (max-width:820px) { .cols { grid-template-columns:1fr; } }
+
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .panel-head { padding:12px 14px; border-bottom:1px solid var(--line); font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; }
+
+  .alert-row { display:grid; grid-template-columns:64px 1fr 100px 88px 90px; gap:8px; align-items:center; padding:11px 14px; border-bottom:1px solid var(--line-soft); transition:background .15s ease; }
+  .alert-row:hover { background: var(--line-soft); }
+  .alert-row:last-child { border-bottom:none; }
+  .alert-row .sym { font-weight:800; font-size:12.5px; }
+  .cond-chip { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; }
+  .cond-chip.above { color:var(--green); } .cond-chip.below { color:var(--red); }
+  .target-line { font-size:11px; }
+  .target-line .cur { color:var(--dim); font-size:9.5px; margin-top:1px; }
+  .progress-track { height:4px; background:var(--line-soft); border-radius:3px; margin-top:5px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:3px; transition:width .5s ease; }
+  .status-pill { font-size:9px; padding:3px 8px; border-radius:20px; font-weight:700; letter-spacing:0.3px; text-align:center; white-space:nowrap; }
+  .status-pill.waiting { color:var(--amber); background:var(--amber-bg); }
+  .status-pill.hit { color:var(--green); background:var(--green-bg); cursor:pointer; }
+  .row-actions { display:flex; gap:5px; justify-content:flex-end; }
+  .mini-btn { background:transparent; border:1px solid var(--line); color:var(--dim2); border-radius:6px; width:24px; height:24px; font-size:11px; cursor:pointer; }
+  .mini-btn:hover { color:var(--red); border-color:var(--red); }
+  .empty { padding:34px 16px; text-align:center; color:var(--dim); font-size:11px; }
+
+  @keyframes flash-g { 0%{background:var(--green-bg);} 100%{background:transparent;} }
+  @keyframes flash-r { 0%{background:var(--red-bg);} 100%{background:transparent;} }
+  .flash-up { animation:flash-g 1.3s ease-out; }
+  .flash-down { animation:flash-r 1.3s ease-out; }
+  @keyframes hit-pulse { 0%,100%{background:var(--green-bg);} 50%{background:transparent;} }
+  .just-hit { animation:hit-pulse 1.6s ease-in-out 2; }
+
+  .feed-body { max-height:420px; overflow-y:auto; }
+  .feed-item { display:flex; justify-content:space-between; padding:7px 14px; border-bottom:1px solid var(--line-soft); font-size:10.5px; }
+  .feed-item .t { color:var(--dim2); font-size:9.5px; }
+  .feed-item .s { font-weight:700; }
+  .feed-item .p { font-variant-numeric:tabular-nums; }
+
+  footer { margin-top:20px; padding-top:14px; border-top:1px solid var(--line); font-size:10px; color:var(--dim2); line-height:1.6; }
+
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; align-items:flex-start; justify-content:center; padding-top:8vh; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--card); border:1px solid var(--line); border-radius:12px; width:min(440px,92vw); padding:18px; }
+  .modal h3 { font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+  .modal h3 .x { cursor:pointer; color:var(--dim2); font-size:16px; }
+  .modal .grp { margin-bottom:16px; }
+  .modal .grp-title { font-size:11px; font-weight:700; margin-bottom:8px; }
+  .modal .row { display:flex; gap:6px; margin-bottom:6px; }
+  .modal input {
+    font-family:var(--mono); background:var(--paper); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:8px 10px; font-size:11px; flex:1;
+  }
+  .modal .btn {
+    font-family:var(--mono); border-radius:6px; padding:8px 12px; font-size:10.5px; cursor:pointer; font-weight:700; border:none;
+  }
+  .modal .btn.primary { background:var(--blue); color:#04141F; }
+  .modal .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  .modal .status { font-size:10px; margin-top:6px; }
+  .modal .status.ok { color:var(--green); } .modal .status.err { color:var(--red); }
+  .modal .hint { font-size:9.5px; color:var(--dim2); margin-top:6px; line-height:1.5; }
+  .full-btn { width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; background:var(--paper); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:10px 12px; font-family:var(--mono); font-size:11px; cursor:pointer; margin-bottom:8px; }
+  .full-btn .state { font-size:9.5px; color:var(--dim); }
+  .full-btn .state.on { color:var(--green); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><span class="live-dot"></span>PRICE ALERT <span class="sub">× SENTINEL</span></div>
+    <div class="head-right">
+      <a href="/" class="nav-link">📊 DASHBOARD</a>
+      <a href="/backtest.html" class="nav-link">🧪 BACKTEST</a>
+      <span class="src-chip" id="server-status" title="Cảnh báo vẫn kiểm tra ngay cả khi bạn tắt trình duyệt/máy tính">🖥 Đang kiểm tra kết nối…</span>
+      <span class="src-chip">Nguồn <b id="src-badge">BINANCE</b></span>
+      <span class="clock" id="clock">--:--:--</span>
+      <button class="icon-btn" id="settings-btn" onclick="openModal()" title="Cài đặt thông báo">⚙</button>
+    </div>
+  </header>
+
+  <div class="section-label">
+    <span>Theo dõi</span>
+    <div class="add-coin-form">
+      <input type="text" id="watch-input" placeholder="VD: BNB" maxlength="10">
+      <button onclick="addWatch()">+ Thêm coin</button>
+    </div>
+  </div>
+  <div class="watchlist" id="watchlist"></div>
+
+  <div class="cols">
+    <div class="panel">
+      <div class="panel-head">Cảnh báo đang theo dõi</div>
+      <div id="alerts-list"><div class="empty">Chưa có cảnh báo — bấm "+ Cảnh báo" trên thẻ coin ở trên để tạo nhanh.</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Nhật ký giá</div>
+      <div class="feed-body" id="feed-body"></div>
+    </div>
+  </div>
+
+  <footer>
+    Giá realtime qua WebSocket Binance (tự động chuyển OKX nếu bị chặn). Cảnh báo &amp; watchlist lưu tại trình duyệt (localStorage). Công cụ tham khảo, không phải khuyến nghị đầu tư.
+  </footer>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <h3>Cài đặt thông báo <span class="x" onclick="closeModal()">✕</span></h3>
+
+    <div class="grp">
+      <div class="grp-title">Thông báo trình duyệt</div>
+      <button class="full-btn" id="notif-toggle" onclick="requestNotifPermission()">
+        <span>Bật popup thông báo khi cảnh báo kích hoạt</span>
+        <span class="state" id="notif-state">chưa bật</span>
+      </button>
+    </div>
+
+    <div class="grp">
+      <div class="grp-title">API Secret (bảo vệ dữ liệu alerts trên server)</div>
+      <div class="row">
+        <input type="text" id="api-secret-input" placeholder="Dán ALERTS_API_SECRET (đã set trên Vercel)">
+        <button class="btn primary" onclick="saveApiSecret()">Lưu</button>
+      </div>
+      <div class="status" id="api-secret-status"></div>
+      <div class="hint">Phải trùng với biến môi trường ALERTS_API_SECRET trên Vercel — nếu không, /api/alerts sẽ từ chối đồng bộ (cảnh báo vẫn chạy được ở tab này nhưng không chạy nền).</div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-title">Telegram Bot</div>
+      <div class="row">
+        <input type="text" id="tg-token-input" placeholder="Bot Token (từ @BotFather)">
+      </div>
+      <div class="row">
+        <input type="text" id="tg-chatid-input" placeholder="Chat ID (từ @userinfobot)">
+        <button class="btn primary" onclick="saveTgConfig()">Lưu</button>
+        <button class="btn ghost" onclick="testTgConfig()">Gửi thử</button>
+      </div>
+      <div class="status" id="tg-status"></div>
+      <div class="hint">Token/Chat ID chỉ lưu trong trình duyệt này (localStorage), không nằm trong mã nguồn khi bạn deploy public.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let watchlist = JSON.parse(localStorage.getItem('pa_watchlist') || '["BTC","ETH","SOL","BNB","XRP"]');
+let alerts = JSON.parse(localStorage.getItem('pa_alerts') || '[]');
+let tgConfig = JSON.parse(localStorage.getItem('pa_telegram') || '{"token":"","chatId":""}');
+let apiSecret = localStorage.getItem('pa_api_secret') || '';
+let notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
+
+let currentPrices = {};
+let prevPrices = {};
+let sparkData = {};
+let chg24h = {};
+let ws = null, wsExchange = 'BINANCE';
+let feedItems = [];
+let lastFeedTime = {};
+
+function saveWatchlist() { localStorage.setItem('pa_watchlist', JSON.stringify(watchlist)); }
+function saveAlertsLocal() { localStorage.setItem('pa_alerts', JSON.stringify(alerts)); }
+function saveAlerts() { saveAlertsLocal(); syncToServer(); }
+function meta(sym) { const s = sym.toUpperCase().trim(); return { symbol:s, binance:s+'USDT', okx:s+'-USDT' }; }
+function fmtPrice(p) {
+  if (p === undefined || p === null || isNaN(p)) return '--';
+  const d = p < 10 ? 4 : 2;
+  return '$' + p.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
+}
+
+/* ============================================================
+   ĐỒNG BỘ SERVER — để cảnh báo vẫn chạy khi tắt trình duyệt/máy tính
+   Server (Vercel Function + Upstash Redis) được 1 cron job bên ngoài
+   gọi định kỳ để tự kiểm tra giá và gửi Telegram, không phụ thuộc tab này.
+   ============================================================ */
+let syncTimer = null;
+function syncToServer() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiSecret },
+        body: JSON.stringify({ alerts, telegram: tgConfig, watchlist })
+      });
+      if (!res.ok) throw new Error(res.status === 401 ? 'unauthorized' : 'HTTP ' + res.status);
+      setServerStatus(true);
+    } catch (e) { setServerStatus(false, e.message === 'unauthorized'); }
+  }, 500);
+}
+async function pullFromServer() {
+  try {
+    const res = await fetch('/api/alerts', { headers: { 'x-api-key': apiSecret } });
+    if (!res.ok) throw new Error(res.status === 401 ? 'unauthorized' : 'HTTP ' + res.status);
+    const data = await res.json();
+    setServerStatus(true);
+    let changed = false;
+    if (data.alerts && data.alerts.length) {
+      data.alerts.forEach(sa => {
+        const la = alerts.find(a => a.id === sa.id);
+        if (la) { if (sa.triggered && !la.triggered) { la.triggered = true; changed = true; } }
+        else { alerts.push(sa); changed = true; }
+      });
+    }
+    if (changed) { saveAlertsLocal(); renderAlerts(); }
+    return true;
+  } catch (e) { setServerStatus(false, e.message === 'unauthorized'); return false; }
+}
+function setServerStatus(ok, unauthorized) {
+  const el = document.getElementById('server-status');
+  if (!el) return;
+  el.textContent = ok ? '🖥 Cảnh báo nền: hoạt động' : (unauthorized ? '🖥 Cảnh báo nền: sai API Secret' : '🖥 Cảnh báo nền: chưa kết nối');
+  el.title = ok ? 'Cảnh báo vẫn kiểm tra ngay cả khi bạn tắt trình duyệt/máy tính' : (unauthorized ? 'Nhập đúng ALERTS_API_SECRET trong ⚙ Cài đặt để đồng bộ server.' : 'Chưa thiết lập /api/alerts — cảnh báo chỉ chạy khi tab này đang mở. Xem hướng dẫn thiết lập.');
+  el.className = 'src-chip' + (ok ? ' server-ok' : ' server-err');
+}
+
+/* ============================================================
+   COINGECKO — badge rank cho các coin phổ biến (không chặn nếu coin lạ)
+   ============================================================ */
+const COINGECKO_IDS = {
+  BTC:'bitcoin', ETH:'ethereum', SOL:'solana', BNB:'binancecoin', XRP:'ripple',
+  DOGE:'dogecoin', ADA:'cardano', MATIC:'matic-network', DOT:'polkadot', AVAX:'avalanche-2',
+  LINK:'chainlink', LTC:'litecoin', TRX:'tron', SHIB:'shiba-inu', UNI:'uniswap',
+  ATOM:'cosmos', XLM:'stellar', NEAR:'near', APT:'aptos', ARB:'arbitrum'
+};
+let cgRank = {};
+async function loadCoinGeckoRanks() {
+  const ids = watchlist.map(s => COINGECKO_IDS[s]).filter(Boolean);
+  if (!ids.length) return;
+  try {
+    const data = await fetchJson(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${[...new Set(ids)].join(',')}`);
+    data.forEach(m => {
+      const sym = Object.keys(COINGECKO_IDS).find(k => COINGECKO_IDS[k] === m.id);
+      if (sym) cgRank[sym] = m.market_cap_rank;
+    });
+    renderWatchlist();
+  } catch (e) { /* không ảnh hưởng giá realtime nếu CoinGecko lỗi */ }
+}
+
+async function fetchJson(url, timeoutMs=8000) {
+  const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+  try { const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+async function fetchWatchSeed(sym) {
+  const m = meta(sym);
+  try {
+    const [ticker, klines] = await Promise.all([
+      fetchJson(`https://api.binance.com/api/v3/ticker/24hr?symbol=${m.binance}`),
+      fetchJson(`https://api.binance.com/api/v3/klines?symbol=${m.binance}&interval=15m&limit=96`)
+    ]);
+    return { price: parseFloat(ticker.lastPrice), chg: parseFloat(ticker.priceChangePercent), closes: klines.map(k=>+k[4]) };
+  } catch (e) {
+    const [t, k] = await Promise.all([
+      fetchJson(`https://www.okx.com/api/v5/market/ticker?instId=${m.okx}`),
+      fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${m.okx}&bar=15m&limit=96`)
+    ]);
+    const d = t.data[0]; const last = parseFloat(d.last), open = parseFloat(d.open24h);
+    const closes = k.data.map(row=>+row[4]).reverse();
+    return { price:last, chg: open?(last-open)/open*100:0, closes };
+  }
+}
+
+function sparkPath(prices, w, h) {
+  if (!prices || prices.length < 2) return '';
+  const min = Math.min(...prices), max = Math.max(...prices), range = (max-min)||1;
+  const step = w/(prices.length-1);
+  return prices.map((p,i)=>`${(i*step).toFixed(1)},${(h-((p-min)/range)*h).toFixed(1)}`).join(' ');
+}
+function renderWatchlist() {
+  const el = document.getElementById('watchlist');
+  el.innerHTML = watchlist.map(sym => {
+    const price = currentPrices[sym];
+    const chg = chg24h[sym];
+    const closes = sparkData[sym] || [];
+    const pts = sparkPath(closes.slice(-60), 156, 36);
+    const color = closes.length>=2 && closes[closes.length-1] >= closes[0] ? 'var(--green)' : 'var(--red)';
+    return `<div class="wcard" data-sym="${sym}">
+      <div class="sym-row"><span class="sym">${sym}</span><span class="rm" onclick="removeWatch('${sym}')" title="Bỏ theo dõi">✕</span></div>
+      ${cgRank[sym] ? `<div class="rank-badge">#${cgRank[sym]} vốn hoá</div>` : ''}
+      <div class="price" id="wprice-${sym}">${fmtPrice(price)}</div>
+      <div class="chg ${chg>=0?'up':'down'}" id="wchg-${sym}">${chg!==undefined?(chg>=0?'+':'')+chg.toFixed(2)+'%':'--'} 24H</div>
+      <svg class="spark" viewBox="0 0 156 36" preserveAspectRatio="none">${pts?`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"/>`:''}</svg>
+      <button class="quick-add" onclick="toggleQuickForm('${sym}')">+ CẢNH BÁO</button>
+      <div class="quick-form" id="qf-${sym}">
+        <div class="qf-type-tabs">
+          <button type="button" class="active" id="qf-tab-price-${sym}" onclick="setQfType('${sym}','price')">GIÁ</button>
+          <button type="button" id="qf-tab-indicator-${sym}" onclick="setQfType('${sym}','indicator')">CHỈ BÁO KỸ THUẬT</button>
+        </div>
+        <div class="qf-price-fields" id="qf-price-${sym}">
+          <select id="qf-cond-${sym}"><option value="above">Vượt trên</option><option value="below">Xuống dưới</option></select>
+          <div class="qf-row">
+            <input type="number" id="qf-target-${sym}" placeholder="Giá mục tiêu" step="any">
+            <button onclick="quickAddAlert('${sym}')">OK</button>
+          </div>
+        </div>
+        <div class="qf-indicator-fields" id="qf-indicator-${sym}">
+          <select id="qf-ind-${sym}">
+            <option value="rsi_oversold">RSI(14) quá bán (&lt;30)</option>
+            <option value="rsi_overbought">RSI(14) quá mua (&gt;70)</option>
+            <option value="golden_cross">Golden Cross (MA50 vượt MA200)</option>
+            <option value="death_cross">Death Cross (MA50 xuống dưới MA200)</option>
+          </select>
+          <div class="qf-row">
+            <button onclick="quickAddAlert('${sym}')" style="width:100%;">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function setQfType(sym, type) {
+  document.getElementById('qf-tab-price-'+sym).classList.toggle('active', type==='price');
+  document.getElementById('qf-tab-indicator-'+sym).classList.toggle('active', type==='indicator');
+  document.getElementById('qf-price-'+sym).classList.toggle('hide', type==='indicator');
+  document.getElementById('qf-indicator-'+sym).classList.toggle('show', type==='indicator');
+}
+function toggleQuickForm(sym) {
+  document.querySelectorAll('.quick-form.open').forEach(f => { if (f.id !== 'qf-'+sym) f.classList.remove('open'); });
+  document.getElementById('qf-'+sym).classList.toggle('open');
+}
+function quickAddAlert(sym) {
+  const isIndicator = document.getElementById('qf-tab-indicator-'+sym).classList.contains('active');
+  const m = meta(sym);
+  let alertObj;
+  if (isIndicator) {
+    const indicator = document.getElementById('qf-ind-'+sym).value;
+    alertObj = { id: Date.now()+Math.random().toString(16).slice(2), symbol:m.symbol, binance:m.binance, okx:m.okx, type:'indicator', indicator, triggered:false, createdAt:Date.now() };
+  } else {
+    const cond = document.getElementById('qf-cond-'+sym).value;
+    const target = parseFloat(document.getElementById('qf-target-'+sym).value);
+    if (!target || target <= 0) { alert('Nhập giá mục tiêu hợp lệ.'); return; }
+    alertObj = { id: Date.now()+Math.random().toString(16).slice(2), symbol:m.symbol, binance:m.binance, okx:m.okx, type:'price', condition:cond, target, triggered:false, createdAt:Date.now() };
+    document.getElementById('qf-target-'+sym).value = '';
+  }
+  alerts.push(alertObj);
+  saveAlerts();
+  document.getElementById('qf-'+sym).classList.remove('open');
+  renderAlerts();
+  connectWS();
+}
+function addWatch() {
+  const input = document.getElementById('watch-input');
+  const sym = input.value.trim().toUpperCase();
+  if (!sym) return;
+  if (watchlist.includes(sym)) { input.value=''; return; }
+  watchlist.push(sym); saveWatchlist(); input.value='';
+  renderWatchlist();
+  fetchWatchSeed(sym).then(d => { sparkData[sym]=d.closes; chg24h[sym]=d.chg; currentPrices[sym]=d.price; renderWatchlist(); }).catch(()=>{});
+  connectWS();
+}
+function removeWatch(sym) {
+  watchlist = watchlist.filter(s => s !== sym);
+  saveWatchlist(); renderWatchlist(); connectWS();
+}
+document.getElementById('watch-input').addEventListener('keydown', e => { if (e.key==='Enter') addWatch(); });
+
+const INDICATOR_LABEL = {
+  rsi_oversold: 'RSI(14) &lt; 30',
+  rsi_overbought: 'RSI(14) &gt; 70',
+  golden_cross: 'Golden Cross MA50/200',
+  death_cross: 'Death Cross MA50/200'
+};
+function renderAlerts() {
+  const el = document.getElementById('alerts-list');
+  if (!alerts.length) { el.innerHTML = '<div class="empty">Chưa có cảnh báo — bấm "+ Cảnh báo" trên thẻ coin ở trên để tạo nhanh.</div>'; return; }
+  const sorted = [...alerts].sort((a,b)=>b.createdAt-a.createdAt);
+  el.innerHTML = sorted.map(a => {
+    const isIndicator = a.type === 'indicator';
+    const price = currentPrices[a.symbol];
+    let condHtml, targetHtml;
+    if (isIndicator) {
+      const cls = (a.indicator||'').includes('oversold') || a.indicator==='golden_cross' ? 'above' : 'below';
+      condHtml = `<span class="cond-chip ${cls}">📊 ${INDICATOR_LABEL[a.indicator] || a.indicator}</span><div class="progress-track"></div>`;
+      targetHtml = `<div id="curprice-${a.id}">${fmtPrice(price)}</div><div class="cur">chỉ báo kỹ thuật</div>`;
+    } else {
+      const dist = price!==undefined ? ((price-a.target)/a.target*100) : undefined;
+      const closeness = dist!==undefined ? Math.max(0, 100-Math.min(Math.abs(dist),100)) : 0;
+      const barColor = closeness>85 ? 'var(--amber)' : (a.condition==='above'?'var(--green)':'var(--red)');
+      condHtml = `<span class="cond-chip ${a.condition}">${a.condition==='above'?'↑ VƯỢT':'↓ XUỐNG'} ${fmtPrice(a.target)}</span>
+        <div class="progress-track"><div class="progress-fill" style="width:${closeness}%; background:${barColor}"></div></div>`;
+      targetHtml = `<div id="curprice-${a.id}">${fmtPrice(price)}</div><div class="cur">${dist!==undefined?(dist>=0?'+':'')+dist.toFixed(2)+'%':'--'}</div>`;
+    }
+    return `<div class="alert-row" data-id="${a.id}">
+      <div class="sym">${a.symbol}</div>
+      <div>${condHtml}</div>
+      <div class="target-line">${targetHtml}</div>
+      <div>${a.triggered
+        ? `<span class="status-pill hit" onclick="rearmAlert('${a.id}')" title="Bấm để kích hoạt lại">ĐÃ BÁO ↺</span>`
+        : `<span class="status-pill waiting">ĐANG CHỜ</span>`}</div>
+      <div class="row-actions"><button class="mini-btn" onclick="deleteAlert('${a.id}')" title="Xoá">✕</button></div>
+    </div>`;
+  }).join('');
+}
+function deleteAlert(id) { alerts = alerts.filter(a=>a.id!==id); saveAlerts(); renderAlerts(); connectWS(); }
+function rearmAlert(id) { const a = alerts.find(x=>x.id===id); if (a){ a.triggered=false; saveAlerts(); renderAlerts(); } }
+
+function pushFeed(sym, price) {
+  const now = Date.now();
+  if (lastFeedTime[sym] && now - lastFeedTime[sym] < 4000) return;
+  lastFeedTime[sym] = now;
+  feedItems.unshift({ t: new Date(), sym, price });
+  if (feedItems.length > 60) feedItems.pop();
+  renderFeed();
+}
+function renderFeed() {
+  const el = document.getElementById('feed-body');
+  el.innerHTML = feedItems.map(f => {
+    const ts = f.t.toLocaleTimeString('vi-VN', { hour12:false });
+    return `<div class="feed-item"><span class="t">${ts}</span><span class="s">${f.sym}</span><span class="p">${fmtPrice(f.price)}</span></div>`;
+  }).join('') || '<div class="empty">Đang chờ dữ liệu…</div>';
+}
+
+function updateNotifUI() {
+  const el = document.getElementById('notif-state');
+  if (notifPermission === 'granted') { el.textContent = 'đã bật'; el.className='state on'; }
+  else if (notifPermission === 'denied') { el.textContent = 'bị chặn'; el.className='state'; }
+  else { el.textContent = 'chưa bật'; el.className='state'; }
+}
+async function requestNotifPermission() {
+  if (typeof Notification === 'undefined') { alert('Trình duyệt không hỗ trợ Notification API.'); return; }
+  notifPermission = await Notification.requestPermission();
+  updateNotifUI();
+}
+function fireNotification(title, body) {
+  if (notifPermission === 'granted') { try { new Notification(title, { body }); } catch(e){} }
+}
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [880,1100].forEach((f,i) => {
+      setTimeout(() => {
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='sine'; o.frequency.value=f;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.5);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.55);
+      }, i*180);
+    });
+  } catch(e) {}
+}
+async function sendTelegramMessage(text) {
+  if (!tgConfig.token || !tgConfig.chatId) return { ok:false, error:'chưa cấu hình' };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${tgConfig.token}/sendMessage`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: tgConfig.chatId, text, parse_mode:'HTML' })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.description || 'lỗi không xác định');
+    return { ok:true };
+  } catch(e) { return { ok:false, error:e.message }; }
+}
+function saveApiSecret() {
+  apiSecret = document.getElementById('api-secret-input').value.trim();
+  localStorage.setItem('pa_api_secret', apiSecret);
+  const st = document.getElementById('api-secret-status'); st.textContent='Đã lưu.'; st.className='status ok';
+  syncToServer();
+}
+function saveTgConfig() {
+  tgConfig = { token: document.getElementById('tg-token-input').value.trim(), chatId: document.getElementById('tg-chatid-input').value.trim() };
+  localStorage.setItem('pa_telegram', JSON.stringify(tgConfig));
+  syncToServer();
+  const st = document.getElementById('tg-status'); st.textContent='Đã lưu.'; st.className='status ok';
+}
+async function testTgConfig() {
+  tgConfig = { token: document.getElementById('tg-token-input').value.trim(), chatId: document.getElementById('tg-chatid-input').value.trim() };
+  const st = document.getElementById('tg-status'); st.textContent='Đang gửi...'; st.className='status';
+  const r = await sendTelegramMessage('✅ <b>Price Alert Sentinel</b> đã kết nối thành công!');
+  if (r.ok) { localStorage.setItem('pa_telegram', JSON.stringify(tgConfig)); syncToServer(); st.textContent='✅ Gửi thành công!'; st.className='status ok'; }
+  else { st.textContent='❌ '+r.error; st.className='status err'; }
+}
+function openModal() {
+  document.getElementById('tg-token-input').value = tgConfig.token || '';
+  document.getElementById('tg-chatid-input').value = tgConfig.chatId || '';
+  document.getElementById('api-secret-input').value = apiSecret || '';
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-backdrop').classList.remove('open'); }
+
+function checkAlerts(symbol, price) {
+  let changed = false;
+  alerts.forEach(a => {
+    if (a.symbol !== symbol || a.triggered) return;
+    if ((a.type || 'price') !== 'price') return; // cảnh báo chỉ báo kỹ thuật do server cron kiểm tra
+    const hit = a.condition==='above' ? price>=a.target : price<=a.target;
+    if (hit) {
+      a.triggered = true; a.triggeredAt = Date.now(); changed = true;
+      const msg = `${a.symbol} đã ${a.condition==='above'?'VƯỢT TRÊN':'XUỐNG DƯỚI'} ${fmtPrice(a.target)} — hiện tại ${fmtPrice(price)}`;
+      fireNotification(`⚡ ${a.symbol} chạm mốc cảnh báo!`, msg);
+      playBeep();
+      if (tgConfig.token && tgConfig.chatId) {
+        sendTelegramMessage(`⚡ <b>${a.symbol}</b> đã ${a.condition==='above'?'VƯỢT TRÊN':'XUỐNG DƯỚI'} <b>${fmtPrice(a.target)}</b>\nGiá hiện tại: <b>${fmtPrice(price)}</b>`);
+      }
+      const row = document.querySelector(`.alert-row[data-id="${a.id}"]`);
+      if (row) { row.classList.add('just-hit'); setTimeout(()=>row.classList.remove('just-hit'), 3300); }
+    }
+  });
+  if (changed) { saveAlerts(); renderAlerts(); }
+}
+
+function watchedSymbols() { return [...new Set([...watchlist, ...alerts.map(a=>a.symbol)])]; }
+
+function connectWS() {
+  if (ws) { try { ws.onclose=null; ws.close(); } catch(e){} ws=null; }
+  const symbols = watchedSymbols();
+  if (!symbols.length) return;
+  connectBinanceWS(symbols);
+}
+function connectBinanceWS(symbols) {
+  const streams = symbols.map(s => meta(s).binance.toLowerCase()+'@ticker').join('/');
+  const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+  let opened = false;
+  try {
+    const socket = new WebSocket(url); ws = socket;
+    const failTimer = setTimeout(() => { if (!opened) { try{socket.close();}catch(e){} connectOkxWS(symbols); } }, 6000);
+    socket.onopen = () => { opened=true; clearTimeout(failTimer); wsExchange='BINANCE'; document.getElementById('src-badge').textContent='BINANCE'; };
+    socket.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data); const d = msg.data; if (!d) return;
+      handlePriceUpdate(d.s.replace('USDT',''), parseFloat(d.c));
+    };
+    socket.onerror = () => { if (!opened) { clearTimeout(failTimer); connectOkxWS(symbols); } };
+  } catch(e) { connectOkxWS(symbols); }
+}
+function connectOkxWS(symbols) {
+  try {
+    const socket = new WebSocket('wss://ws.okx.com:8443/ws/v5/public'); ws = socket;
+    socket.onopen = () => {
+      wsExchange='OKX'; document.getElementById('src-badge').textContent='OKX';
+      socket.send(JSON.stringify({ op:'subscribe', args: symbols.map(s=>({channel:'tickers', instId: meta(s).okx})) }));
+    };
+    socket.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.data && msg.data[0]) { const d=msg.data[0]; handlePriceUpdate(d.instId.replace('-USDT',''), parseFloat(d.last)); }
+    };
+  } catch(e) {}
+}
+function handlePriceUpdate(sym, price) {
+  prevPrices[sym] = currentPrices[sym];
+  currentPrices[sym] = price;
+  if (watchlist.includes(sym)) {
+    if (!sparkData[sym]) sparkData[sym] = [];
+    sparkData[sym].push(price);
+    if (sparkData[sym].length > 120) sparkData[sym].shift();
+    const priceEl = document.getElementById('wprice-'+sym);
+    if (priceEl) {
+      priceEl.textContent = fmtPrice(price);
+      const prev = prevPrices[sym];
+      priceEl.style.color = (prev!==undefined && price>prev) ? 'var(--green)' : (prev!==undefined && price<prev) ? 'var(--red)' : '';
+      if (prev !== undefined && price !== prev) {
+        priceEl.classList.remove('pop'); void priceEl.offsetWidth; priceEl.classList.add('pop');
+      }
+    }
+  }
+  document.querySelectorAll('.alert-row').forEach(row => {
+    const id = row.dataset.id; const a = alerts.find(x=>x.id===id);
+    if (a && a.symbol===sym) {
+      const cell = document.getElementById('curprice-'+id);
+      if (cell) {
+        const prev = prevPrices[sym];
+        cell.textContent = fmtPrice(price);
+        if (prev!==undefined && price!==prev) {
+          row.classList.remove('flash-up','flash-down'); void row.offsetWidth;
+          row.classList.add(price>prev ? 'flash-up' : 'flash-down');
+        }
+      }
+    }
+  });
+  pushFeed(sym, price);
+  checkAlerts(sym, price);
+}
+
+function tickClock() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('vi-VN', { hour12:false }); }
+setInterval(tickClock, 1000); tickClock();
+
+async function init() {
+  renderWatchlist(); renderAlerts(); renderFeed(); updateNotifUI();
+  const results = await Promise.allSettled(watchlist.map(s => fetchWatchSeed(s)));
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      const sym = watchlist[i];
+      sparkData[sym] = r.value.closes; chg24h[sym] = r.value.chg; currentPrices[sym] = r.value.price;
+    }
+  });
+  renderWatchlist();
+  connectWS();
+  loadCoinGeckoRanks();
+  setInterval(loadCoinGeckoRanks, 300000);
+
+  const pulled = await pullFromServer();
+  if (pulled && alerts.length) syncToServer(); // đẩy lên server lần đầu nếu local có dữ liệu server chưa có
+  setInterval(pullFromServer, 30000);
+}
+init();
+</script>
+</body>
+</html>

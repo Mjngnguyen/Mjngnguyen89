@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BACKTEST × SENTINEL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#0F1012; --card:#16171B; --ink:#E9E8E5; --dim:#8B8D93; --dim2:#5B5D63;
+    --line:#26272C; --line-soft:#1D1E22;
+    --green:#4ADE80; --green-bg:rgba(74,222,128,0.10);
+    --red:#F87171; --red-bg:rgba(248,113,113,0.10);
+    --blue:#3B9BE8;
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:12.5px; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1000px; margin:0 auto; padding:0 16px 32px; }
+  .up { color:var(--green); } .down { color:var(--red); }
+
+  header { display:flex; align-items:center; justify-content:space-between; padding:18px 0 14px; flex-wrap:wrap; gap:10px; }
+  .brand { font-weight:800; font-size:14px; letter-spacing:0.5px; }
+  .brand .sub { color:var(--dim); font-weight:400; font-size:11px; }
+  .nav-link { color:var(--dim); text-decoration:none; font-size:10px; letter-spacing:0.8px; border:1px solid var(--line); padding:3px 8px; border-radius:3px; margin-left:8px; }
+  .nav-link:hover { color:var(--ink); border-color:var(--dim2); }
+
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .panel-title { font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; margin-bottom:12px; }
+
+  .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px; align-items:end; }
+  .field label { display:block; font-size:9.5px; color:var(--dim); margin-bottom:5px; letter-spacing:0.3px; }
+  .field select, .field input {
+    width:100%; font-family:var(--mono); background:var(--paper); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:8px 9px; font-size:11px;
+  }
+  .run-btn {
+    font-family:var(--mono); background:var(--blue); color:#04141F; border:none; border-radius:6px;
+    padding:9px 20px; font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.3px;
+  }
+  .run-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-top:16px; }
+  .stat-cell { background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .stat-cell .lbl { font-size:9px; color:var(--dim); letter-spacing:0.5px; text-transform:uppercase; }
+  .stat-cell .val { font-size:19px; font-weight:800; margin-top:5px; }
+
+  #equity-chart { width:100%; height:220px; margin-top:16px; display:block; }
+
+  .trade-log { max-height:260px; overflow-y:auto; margin-top:14px; border-top:1px solid var(--line); }
+  .trade-row { display:grid; grid-template-columns:70px 1fr 90px 90px 90px; gap:8px; padding:7px 4px; border-bottom:1px solid var(--line-soft); font-size:10.5px; }
+  .trade-head { font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:0.5px; padding:7px 4px; }
+
+  .empty { padding:40px 16px; text-align:center; color:var(--dim); font-size:11px; }
+  footer { margin-top:10px; padding-top:14px; border-top:1px solid var(--line); font-size:10px; color:var(--dim2); line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">BACKTEST <span class="sub">× SENTINEL</span>
+      <a href="/" class="nav-link">📊 DASHBOARD</a>
+      <a href="/alert.html" class="nav-link">⚡ PRICE ALERT</a>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="panel-title">Cấu hình mô phỏng</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Coin</label>
+        <select id="bt-symbol"><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="BNB">BNB</option><option value="XRP">XRP</option></select>
+      </div>
+      <div class="field">
+        <label>Chiến lược</label>
+        <select id="bt-strategy">
+          <option value="rsi">RSI(14) — mua &lt;30, bán &gt;70</option>
+          <option value="ma_cross">MA Cross — MA20/MA50</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Số ngày lùi lại</label>
+        <select id="bt-days">
+          <option value="90">90 ngày</option>
+          <option value="180" selected>180 ngày</option>
+          <option value="365">365 ngày</option>
+        </select>
+      </div>
+      <div class="field">
+        <button class="run-btn" id="bt-run" onclick="runBacktest()">▶ Chạy mô phỏng</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="result-panel" style="display:none;">
+    <div class="panel-title">Kết quả</div>
+    <div class="stats-grid">
+      <div class="stat-cell"><div class="lbl">Lợi nhuận chiến lược</div><div class="val" id="stat-return">--</div></div>
+      <div class="stat-cell"><div class="lbl">Mua &amp; giữ (Buy&amp;Hold)</div><div class="val" id="stat-bh">--</div></div>
+      <div class="stat-cell"><div class="lbl">Tỷ lệ thắng</div><div class="val" id="stat-winrate">--</div></div>
+      <div class="stat-cell"><div class="lbl">Số lệnh</div><div class="val" id="stat-trades">--</div></div>
+      <div class="stat-cell"><div class="lbl">Max Drawdown</div><div class="val" id="stat-dd">--</div></div>
+    </div>
+    <svg id="equity-chart" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
+    <div style="display:flex; gap:16px; font-size:10px; color:var(--dim); margin-top:6px;">
+      <span><span style="color:var(--blue);">■</span> Chiến lược</span>
+      <span><span style="color:var(--dim2);">■</span> Mua &amp; giữ</span>
+    </div>
+    <div class="trade-log">
+      <div class="trade-row trade-head"><div>Loại</div><div>Ngày</div><div>Vào lệnh</div><div>Ra lệnh</div><div>Lãi/lỗ</div></div>
+      <div id="trade-list"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="empty-panel">
+    <div class="empty">Chọn coin, chiến lược và số ngày, rồi bấm "Chạy mô phỏng" để xem kết quả trên dữ liệu giá thật.</div>
+  </div>
+
+  <footer>
+    <strong>Lưu ý quan trọng:</strong> Đây là mô phỏng trên dữ liệu quá khứ (Binance/OKX), <strong>không đảm bảo kết quả tương lai</strong>.
+    Không tính phí giao dịch/trượt giá. Chỉ mang tính tham khảo học tập, không phải khuyến nghị đầu tư.
+  </footer>
+</div>
+
+<script>
+async function fetchJson(url, timeoutMs = 10000) {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try { const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+async function fetchDailyCloses(symbol, days) {
+  const limit = Math.min(days + 60, 1000); // dư thêm để có đủ dữ liệu tính MA/RSI ngay từ đầu
+  try {
+    const r = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=${limit}`);
+    return r.map(k => ({ t: k[0], c: parseFloat(k[4]) }));
+  } catch (e) {
+    const r = await fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${symbol}-USDT&bar=1D&limit=${limit}`);
+    return r.data.map(row => ({ t: +row[0], c: parseFloat(row[4]) })).reverse();
+  }
+}
+
+function sma(arr, i, p) { if (i < p - 1) return null; let s = 0; for (let j = i - p + 1; j <= i; j++) s += arr[j]; return s / p; }
+function rsiAt(arr, i, p = 14) {
+  if (i < p) return null;
+  let g = 0, l = 0;
+  for (let j = i - p + 1; j <= i; j++) { const d = arr[j] - arr[j - 1]; if (d >= 0) g += d; else l -= d; }
+  const ag = g / p, al = l / p; if (al === 0) return 100; return 100 - 100 / (1 + ag / al);
+}
+
+function runStrategy(candles, strategy) {
+  const closes = candles.map(c => c.c);
+  const trades = [];
+  let inPosition = false, entryPrice = 0, entryIdx = 0;
+
+  for (let i = 1; i < closes.length; i++) {
+    if (strategy === 'rsi') {
+      const r = rsiAt(closes, i, 14);
+      if (r === null) continue;
+      if (!inPosition && r < 30) { inPosition = true; entryPrice = closes[i]; entryIdx = i; }
+      else if (inPosition && r > 70) {
+        trades.push({ entryIdx, exitIdx: i, entryPrice, exitPrice: closes[i] });
+        inPosition = false;
+      }
+    } else if (strategy === 'ma_cross') {
+      const ma20 = sma(closes, i, 20), ma50 = sma(closes, i, 50);
+      const pma20 = sma(closes, i - 1, 20), pma50 = sma(closes, i - 1, 50);
+      if (ma20 === null || ma50 === null || pma20 === null || pma50 === null) continue;
+      const crossUp = pma20 <= pma50 && ma20 > ma50;
+      const crossDown = pma20 >= pma50 && ma20 < ma50;
+      if (!inPosition && crossUp) { inPosition = true; entryPrice = closes[i]; entryIdx = i; }
+      else if (inPosition && crossDown) {
+        trades.push({ entryIdx, exitIdx: i, entryPrice, exitPrice: closes[i] });
+        inPosition = false;
+      }
+    }
+  }
+  if (inPosition) trades.push({ entryIdx, exitIdx: closes.length - 1, entryPrice, exitPrice: closes[closes.length - 1], open: true });
+  return trades;
+}
+
+function buildEquityCurve(closes, trades, startIdx) {
+  const equity = new Array(closes.length).fill(100);
+  let capital = 100, tradeIdx = 0, inPos = false, entryPrice = 0, shares = 0;
+  for (let i = startIdx; i < closes.length; i++) {
+    while (tradeIdx < trades.length && trades[tradeIdx].entryIdx === i) { inPos = true; entryPrice = closes[i]; shares = capital / entryPrice; }
+    if (inPos) capital = shares * closes[i];
+    while (tradeIdx < trades.length && trades[tradeIdx].exitIdx === i) { inPos = false; tradeIdx++; }
+    equity[i] = capital;
+  }
+  return equity;
+}
+function maxDrawdown(equity) {
+  let peak = -Infinity, maxDd = 0;
+  for (const v of equity) { if (v > peak) peak = v; const dd = (peak - v) / peak; if (dd > maxDd) maxDd = dd; }
+  return maxDd * 100;
+}
+
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function fmtPrice(p) { const d = p < 10 ? 4 : 2; return '$' + p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+
+async function runBacktest() {
+  const symbol = document.getElementById('bt-symbol').value;
+  const strategy = document.getElementById('bt-strategy').value;
+  const days = parseInt(document.getElementById('bt-days').value);
+  const btn = document.getElementById('bt-run');
+  btn.disabled = true; btn.textContent = 'Đang tải dữ liệu…';
+  document.getElementById('empty-panel').style.display = 'none';
+
+  try {
+    const candles = await fetchDailyCloses(symbol, days);
+    const closes = candles.map(c => c.c);
+    const startIdx = Math.max(0, closes.length - days);
+
+    const trades = runStrategy(candles, strategy).filter(t => t.entryIdx >= startIdx - 5);
+    const equity = buildEquityCurve(closes, trades, startIdx);
+    const strategyReturn = ((equity[equity.length - 1] - 100) / 100) * 100;
+    const bhReturn = ((closes[closes.length - 1] - closes[startIdx]) / closes[startIdx]) * 100;
+    const closedTrades = trades.filter(t => !t.open);
+    const wins = closedTrades.filter(t => t.exitPrice > t.entryPrice).length;
+    const winRate = closedTrades.length ? (wins / closedTrades.length) * 100 : 0;
+    const dd = maxDrawdown(equity.slice(startIdx));
+
+    document.getElementById('stat-return').textContent = fmtPct(strategyReturn);
+    document.getElementById('stat-return').className = 'val ' + (strategyReturn >= 0 ? 'up' : 'down');
+    document.getElementById('stat-bh').textContent = fmtPct(bhReturn);
+    document.getElementById('stat-bh').className = 'val ' + (bhReturn >= 0 ? 'up' : 'down');
+    document.getElementById('stat-winrate').textContent = closedTrades.length ? winRate.toFixed(0) + '%' : '--';
+    document.getElementById('stat-trades').textContent = trades.length;
+    document.getElementById('stat-dd').textContent = '-' + dd.toFixed(1) + '%';
+    document.getElementById('stat-dd').className = 'val down';
+
+    renderEquityChart(equity.slice(startIdx), closes.slice(startIdx));
+    renderTradeLog(trades, candles);
+
+    document.getElementById('result-panel').style.display = 'block';
+  } catch (e) {
+    document.getElementById('empty-panel').style.display = 'block';
+    document.getElementById('empty-panel').querySelector('.empty').textContent = 'Lỗi tải dữ liệu: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ Chạy mô phỏng';
+  }
+}
+
+function renderEquityChart(equity, closes) {
+  const w = 900, h = 220, pad = 10;
+  const bh = closes.map(c => (c / closes[0]) * 100);
+  const all = [...equity, ...bh];
+  const min = Math.min(...all), max = Math.max(...all), range = (max - min) || 1;
+  const step = (w - pad * 2) / (equity.length - 1 || 1);
+  const toPts = (arr) => arr.map((v, i) => `${(pad + i * step).toFixed(1)},${(h - pad - ((v - min) / range) * (h - pad * 2)).toFixed(1)}`).join(' ');
+  const svg = document.getElementById('equity-chart');
+  svg.innerHTML = `
+    <polyline points="${toPts(bh)}" fill="none" stroke="#5B5D63" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <polyline points="${toPts(equity)}" fill="none" stroke="#3B9BE8" stroke-width="2"/>
+  `;
+}
+
+function renderTradeLog(trades, candles) {
+  const el = document.getElementById('trade-list');
+  if (!trades.length) { el.innerHTML = '<div class="empty">Không có lệnh nào khớp điều kiện trong khoảng thời gian này.</div>'; return; }
+  el.innerHTML = trades.slice().reverse().map(t => {
+    const entryDate = new Date(candles[t.entryIdx].t).toLocaleDateString('vi-VN');
+    const pnl = ((t.exitPrice - t.entryPrice) / t.entryPrice) * 100;
+    return `<div class="trade-row">
+      <div>${t.open ? 'ĐANG MỞ' : 'ĐÓNG'}</div>
+      <div>${entryDate} → ${t.open ? 'nay' : new Date(candles[t.exitIdx].t).toLocaleDateString('vi-VN')}</div>
+      <div>${fmtPrice(t.entryPrice)}</div>
+      <div>${fmtPrice(t.exitPrice)}</div>
+      <div class="${pnl >= 0 ? 'up' : 'down'}">${fmtPct(pnl)}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
