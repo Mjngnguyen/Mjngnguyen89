@@ -101,6 +101,46 @@
   }
   #flow-hero-spacer { height: 220vh; }
 
+  /* ===== coin name labels floating over the wave lanes ===== */
+  #flow-hero-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .flow-hero-label {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    text-shadow: 0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+    transition: opacity 0.3s ease;
+  }
+
+  /* ===== top movers panel ===== */
+  .flow-hero-trending {
+    font-family: var(--mono);
+    background: rgba(2,22,12,0.55);
+    border: 1px solid rgba(122,255,191,0.25);
+    border-radius: 8px;
+    padding: 10px 16px;
+    min-width: 240px;
+  }
+  .fht-title {
+    font-size: 9.5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(122,255,191,0.7);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .fht-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 14px;
+    font-size: 11px;
+  }
+  .fht-row { display: flex; justify-content: space-between; gap: 8px; }
+  .fht-row .sym { color: var(--ink, #E9E8E5); font-weight: 700; }
+
   /* ===== top bar ===== */
   .topbar {
     display: flex;
@@ -402,9 +442,14 @@
 
 <div id="flow-hero">
   <canvas id="flow-hero-canvas"></canvas>
+  <div id="flow-hero-labels"></div>
   <div class="flow-hero-overlay">
     <div class="flow-hero-logo">CRYPTO PULSE <span>× TERMINAL</span></div>
     <div class="flow-hero-ticker" id="flow-hero-ticker">BTC —</div>
+    <div class="flow-hero-trending">
+      <div class="fht-title" id="fht-title">TOP TĂNG GIÁ · 1H</div>
+      <div class="fht-list" id="fht-list"></div>
+    </div>
     <div class="flow-hero-scrollhint">scroll ↓</div>
   </div>
 </div>
@@ -458,6 +503,9 @@ const canvas = document.getElementById('flow-hero-canvas');
 const heroEl = document.getElementById('flow-hero');
 const heroSpacer = document.getElementById('flow-hero-spacer');
 const heroTickerEl = document.getElementById('flow-hero-ticker');
+const heroLabelsEl = document.getElementById('flow-hero-labels');
+const fhtTitleEl = document.getElementById('fht-title');
+const fhtListEl = document.getElementById('fht-list');
 
 const renderer = new THREE.WebGL1Renderer({ canvas, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -742,13 +790,15 @@ setInterval(applyMood, 1000);
 /* ===== top-100 coins -> per-lane wave color (real green/red, not decorative) ===== */
 const upLow = hexToVec3('#02160c'), upHigh = hexToVec3('#34e89a');
 const downLow = hexToVec3('#1a0604'), downHigh = hexToVec3('#ff4d4d');
+let latestCoins = [];
 async function fetchTop100Coins() {
   try {
-    const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h');
+    const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=1h,24h,7d');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const coins = await res.json();
+    latestCoins = coins;
     for (let i = 0; i < COIN_BANDS; i++) {
-      const chg = coins[i]?.price_change_percentage_24h ?? 0;
+      const chg = coins[i]?.price_change_percentage_24h_in_currency ?? coins[i]?.price_change_percentage_24h ?? 0;
       const mag = clamp(Math.abs(chg) / 12, 0, 1);
       const c = chg >= 0 ? upLow.clone().lerp(upHigh, 0.35 + mag * 0.65) : downLow.clone().lerp(downHigh, 0.35 + mag * 0.65);
       coinColorData[i * 4]     = Math.round(c.x * 255);
@@ -757,12 +807,87 @@ async function fetchTop100Coins() {
       coinColorData[i * 4 + 3] = 255;
     }
     coinColorTex.needsUpdate = true;
+    updateLabelContent();
+    renderTrendingPanel();
   } catch (e) {
-    // CoinGecko lỗi/rate-limit — giữ nguyên màu hiện tại (mint mặc định), không ảnh hưởng phần còn lại của hero
+    // CoinGecko lỗi/rate-limit — giữ nguyên màu/nhãn hiện tại, không ảnh hưởng phần còn lại của hero
   }
 }
 fetchTop100Coins();
 setInterval(fetchTop100Coins, 300000);
+
+/* ===== fixed coin-name labels on the ~10 biggest wave lanes (nearest camera) ===== */
+const LABEL_COUNT = 10;
+const labelEls = [];
+for (let i = 0; i < LABEL_COUNT; i++) {
+  const el = document.createElement('div');
+  el.className = 'flow-hero-label';
+  el.style.display = 'none';
+  heroLabelsEl.appendChild(el);
+  labelEls.push(el);
+}
+function updateLabelContent() {
+  for (let i = 0; i < LABEL_COUNT; i++) {
+    const coin = latestCoins[i];
+    const el = labelEls[i];
+    if (!coin) { el.style.display = 'none'; continue; }
+    const chg = coin.price_change_percentage_24h_in_currency ?? coin.price_change_percentage_24h ?? 0;
+    el.textContent = coin.symbol.toUpperCase();
+    el.style.color = chg >= 0 ? '#7CFFB2' : '#FF8A80';
+  }
+}
+// Anchor point for band i on the flattened sheet (see pointsVertexShader: wp.x = x*13 + y*6,
+// wp.z = z*25; representative vertex taken at the sphere's y=0, x>0 point for that z-band).
+const SPHERE_R = 4.2;
+function bandAnchor(i, out) {
+  const band = (i + 0.5) / COIN_BANDS;
+  const z = (band - 0.5) * 2 * SPHERE_R;
+  const x = Math.sqrt(Math.max(0, SPHERE_R * SPHERE_R - z * z));
+  out.set(x * 13.0 * scale, 0.45, z * 25.0 * scale);
+  return out;
+}
+const _labelAnchor = new THREE.Vector3();
+const _labelProj = new THREE.Vector3();
+function updateLabelPositions() {
+  for (let i = 0; i < LABEL_COUNT; i++) {
+    const el = labelEls[i];
+    if (!latestCoins[i]) continue;
+    // spread the 10 labels across the full depth range instead of clustering at bands 0-9
+    // (top-10-by-marketcap all live in a narrow slice of the 0-99 band range otherwise)
+    bandAnchor(i * (COIN_BANDS / LABEL_COUNT), _labelAnchor);
+    _labelProj.copy(_labelAnchor).project(camera);
+    if (_labelProj.z > 1 || _labelProj.z < -1) { el.style.display = 'none'; continue; }
+    const sx = (_labelProj.x * 0.5 + 0.5) * innerWidth;
+    const sy = (-_labelProj.y * 0.5 + 0.5) * innerHeight;
+    if (sx < -40 || sx > innerWidth + 40 || sy < -20 || sy > innerHeight + 20) { el.style.display = 'none'; continue; }
+    el.style.display = 'block';
+    el.style.left = sx + 'px';
+    el.style.top = sy + 'px';
+  }
+}
+
+/* ===== top movers panel — cycles through 1h / 24h / 7d ===== */
+const TREND_FIELDS = [
+  { key: '1h',  field: 'price_change_percentage_1h_in_currency',  label: '1H' },
+  { key: '24h', field: 'price_change_percentage_24h_in_currency', label: '24H' },
+  { key: '7d',  field: 'price_change_percentage_7d_in_currency',  label: '7D' }
+];
+let trendIdx = 0;
+function renderTrendingPanel() {
+  if (!latestCoins.length) return;
+  const tf = TREND_FIELDS[trendIdx];
+  fhtTitleEl.textContent = `TOP TĂNG GIÁ · ${tf.label}`;
+  const ranked = latestCoins
+    .filter(c => typeof c[tf.field] === 'number')
+    .sort((a, b) => b[tf.field] - a[tf.field])
+    .slice(0, 10);
+  fhtListEl.innerHTML = ranked.map(c => {
+    const chg = c[tf.field];
+    const cls = chg >= 0 ? '#7CFFB2' : '#FF8A80';
+    return `<div class="fht-row"><span class="sym">${c.symbol.toUpperCase()}</span><span style="color:${cls}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div>`;
+  }).join('');
+}
+setInterval(() => { trendIdx = (trendIdx + 1) % TREND_FIELDS.length; renderTrendingPanel(); }, 5000);
 
 /* ===== scroll (relative to the hero's own spacer, not the whole page) ===== */
 let scrollTarget = 0, scrollSmooth = 0, scrollCurrent = 0;
@@ -836,6 +961,7 @@ function updateHeroVisibility(frac) {
   const op = frac <= fadeStart ? 1 : clamp(1 - (frac - fadeStart) / (1 - fadeStart), 0, 1);
   heroEl.style.opacity = op;
   heroActive = op > 0.001;
+  heroLabelsEl.style.display = heroActive ? 'block' : 'none';
 }
 
 function resize() {
@@ -861,6 +987,7 @@ function animate() {
   mouse.x = Lerp(mouse.x, mouseTarget.x, 0.06);
   mouse.y = Lerp(mouse.y, mouseTarget.y, 0.06);
   sceneObj.render(scrollCurrent, mouse);
+  updateLabelPositions();
   camera.layers.set(LAYERS.TORUS_SCENE);  torusComposer.render();
   camera.layers.set(LAYERS.BLOOM_SCENE);  bloomComposer.render();
   camera.layers.set(LAYERS.ENTIRE_SCENE); finalComposer.render();
