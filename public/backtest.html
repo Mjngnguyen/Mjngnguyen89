@@ -123,29 +123,18 @@
   </footer>
 </div>
 
+<script src="/js/common.js"></script>
 <script>
-async function fetchJson(url, timeoutMs = 10000) {
-  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try { const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
-  finally { clearTimeout(t); }
-}
+/* fetchJson / smaAt / rsiAt nay dùng chung từ js/common.js */
 async function fetchDailyCloses(symbol, days) {
   const limit = Math.min(days + 60, 1000); // dư thêm để có đủ dữ liệu tính MA/RSI ngay từ đầu
   try {
-    const r = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=${limit}`);
+    const r = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=${limit}`, 10000);
     return r.map(k => ({ t: k[0], c: parseFloat(k[4]) }));
   } catch (e) {
-    const r = await fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${symbol}-USDT&bar=1D&limit=${limit}`);
+    const r = await fetchJson(`https://www.okx.com/api/v5/market/candles?instId=${symbol}-USDT&bar=1D&limit=${limit}`, 10000);
     return r.data.map(row => ({ t: +row[0], c: parseFloat(row[4]) })).reverse();
   }
-}
-
-function sma(arr, i, p) { if (i < p - 1) return null; let s = 0; for (let j = i - p + 1; j <= i; j++) s += arr[j]; return s / p; }
-function rsiAt(arr, i, p = 14) {
-  if (i < p) return null;
-  let g = 0, l = 0;
-  for (let j = i - p + 1; j <= i; j++) { const d = arr[j] - arr[j - 1]; if (d >= 0) g += d; else l -= d; }
-  const ag = g / p, al = l / p; if (al === 0) return 100; return 100 - 100 / (1 + ag / al);
 }
 
 function runStrategy(candles, strategy) {
@@ -163,8 +152,8 @@ function runStrategy(candles, strategy) {
         inPosition = false;
       }
     } else if (strategy === 'ma_cross') {
-      const ma20 = sma(closes, i, 20), ma50 = sma(closes, i, 50);
-      const pma20 = sma(closes, i - 1, 20), pma50 = sma(closes, i - 1, 50);
+      const ma20 = smaAt(closes, i, 20), ma50 = smaAt(closes, i, 50);
+      const pma20 = smaAt(closes, i - 1, 20), pma50 = smaAt(closes, i - 1, 50);
       if (ma20 === null || ma50 === null || pma20 === null || pma50 === null) continue;
       const crossUp = pma20 <= pma50 && ma20 > ma50;
       const crossDown = pma20 >= pma50 && ma20 < ma50;
