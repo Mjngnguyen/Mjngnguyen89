@@ -563,12 +563,25 @@ float snoise(vec3 v){
 }
 `;
 
+/* Top-100 coin color band — each depth-slice of the wave (position.z) is bucketed into
+   one of COIN_BANDS lanes, each lane tinted by that coin's real 24h %change (green=up, red=down). */
+const COIN_BANDS = 100;
+const coinColorData = new Uint8Array(COIN_BANDS * 4);
+for (let i = 0; i < COIN_BANDS; i++) {
+  coinColorData[i * 4] = 0x34; coinColorData[i * 4 + 1] = 0xe8; coinColorData[i * 4 + 2] = 0x9a; coinColorData[i * 4 + 3] = 255;
+}
+const coinColorTex = new THREE.DataTexture(coinColorData, COIN_BANDS, 1, THREE.RGBAFormat);
+coinColorTex.magFilter = THREE.NearestFilter;
+coinColorTex.minFilter = THREE.NearestFilter;
+coinColorTex.needsUpdate = true;
+
 const uniforms = {
   uTime:          { value: 0 },
   uStream:        { value: 0 },
   uAppear:        { value: 0 },
   uColLow:        { value: hexToVec3(colorLow) },
   uColHigh:       { value: hexToVec3(colorHigh) },
+  uCoinColors:    { value: coinColorTex },
   uOpacity:       { value: opacity },
   uSize:          { value: pointSize },
   uBrightness:    { value: brightness },
@@ -583,7 +596,7 @@ const uniforms = {
 
 const pointsVertexShader = /* glsl */ `
 uniform float uTime; uniform float uStream; uniform float uSize; uniform float uWaveHeight; uniform float uFlow; uniform float uScale;
-uniform vec3 uColLow; uniform vec3 uColHigh;
+uniform vec3 uColLow; uniform vec3 uColHigh; uniform sampler2D uCoinColors;
 uniform vec3 uCursor; uniform float uRepelRadius; uniform float uRepelStrength; uniform float uActivity;
 varying float vFade; varying vec3 vColor;
 ${SNOISE}
@@ -603,8 +616,11 @@ void main() {
   modelPosition.xyz += normalize(toP + vec3(0.0001)) * fall * uRepelStrength * uActivity;
   vec4 mvPosition = viewMatrix * modelPosition;
 
+  // position.z (sphere depth, -4.2..4.2) picks which of the top-100 coin lanes this vertex belongs to.
+  float band = clamp(position.z / 4.2 * 0.5 + 0.5, 0.0, 1.0);
+  vec3 coinColor = texture2D(uCoinColors, vec2(band, 0.5)).rgb;
   float colMix = smoothstep(-3.0, 3.0, position.y + position.x * 0.5);
-  vColor = mix(uColLow, uColHigh, clamp(colMix, 0.0, 1.0));
+  vColor = mix(uColLow, coinColor, clamp(colMix, 0.0, 1.0));
   vFade = 1.0;
 
   gl_PointSize = uSize * (10.0 / -mvPosition.z);
@@ -708,17 +724,11 @@ void main(){ vec2 p = gl_PointCoord - 0.5; float l = length(p); if (l > 0.5) dis
   scene.add(pts);
 })();
 
-/* ===== market mood — read what the dashboard already knows (FNG + BTC 24h change)
-   and use it to color/intensify the wave, instead of it being purely decorative. ===== */
+/* ===== market mood — BTC 24h change still drives overall swell intensity ===== */
 let currentWaveHeight = waveHeight;
-const neutralHigh = hexToVec3(colorHigh);
-const fearHigh = hexToVec3('#ff6b4a');
 function applyMood() {
   const m = window.__marketMood || {};
-  const fng = m.fng ?? 50;
   const chg = m.chg24h ?? 0;
-  const fearT = clamp((50 - fng) / 50, 0, 1);
-  uniforms.uColHigh.value.copy(neutralHigh).lerp(fearHigh, fearT * 0.6);
   const turb = clamp(Math.abs(chg) / 8, 0, 1);
   currentWaveHeight = waveHeight * (1 + turb * 0.8);
   if (heroTickerEl && m.price != null) {
@@ -728,6 +738,31 @@ function applyMood() {
   }
 }
 setInterval(applyMood, 1000);
+
+/* ===== top-100 coins -> per-lane wave color (real green/red, not decorative) ===== */
+const upLow = hexToVec3('#02160c'), upHigh = hexToVec3('#34e89a');
+const downLow = hexToVec3('#1a0604'), downHigh = hexToVec3('#ff4d4d');
+async function fetchTop100Coins() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const coins = await res.json();
+    for (let i = 0; i < COIN_BANDS; i++) {
+      const chg = coins[i]?.price_change_percentage_24h ?? 0;
+      const mag = clamp(Math.abs(chg) / 12, 0, 1);
+      const c = chg >= 0 ? upLow.clone().lerp(upHigh, 0.35 + mag * 0.65) : downLow.clone().lerp(downHigh, 0.35 + mag * 0.65);
+      coinColorData[i * 4]     = Math.round(c.x * 255);
+      coinColorData[i * 4 + 1] = Math.round(c.y * 255);
+      coinColorData[i * 4 + 2] = Math.round(c.z * 255);
+      coinColorData[i * 4 + 3] = 255;
+    }
+    coinColorTex.needsUpdate = true;
+  } catch (e) {
+    // CoinGecko lỗi/rate-limit — giữ nguyên màu hiện tại (mint mặc định), không ảnh hưởng phần còn lại của hero
+  }
+}
+fetchTop100Coins();
+setInterval(fetchTop100Coins, 300000);
 
 /* ===== scroll (relative to the hero's own spacer, not the whole page) ===== */
 let scrollTarget = 0, scrollSmooth = 0, scrollCurrent = 0;
