@@ -163,6 +163,9 @@
   .fht-row { display: flex; justify-content: space-between; gap: 16px; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; transition: background 0.15s ease; }
   .fht-row:hover { background: rgba(122,255,191,0.12); }
   .fht-row.is-pinned { background: rgba(122,255,191,0.2); }
+  .fht-loading { color: rgba(122,255,191,0.5); font-style: italic; animation: fht-pulse 1.4s ease-in-out infinite; }
+  .fht-error { color: #FF8A80; font-style: italic; }
+  @keyframes fht-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.9; } }
   .fht-row .sym { color: var(--ink, #E9E8E5); font-weight: 700; }
 
   /* ===== top bar ===== */
@@ -471,15 +474,15 @@
     <div class="flow-hero-logo">CRYPTO PULSE <span>× TERMINAL</span></div>
     <div class="flow-hero-ticker" id="flow-hero-ticker">BTC —</div>
     <div class="flow-hero-trending">
-      <div class="fht-title" id="fht-title">TOP BIẾN ĐỘNG · 1H</div>
+      <div class="fht-title" id="fht-title">TOP BIẾN ĐỘNG · đang tải…</div>
       <div class="fht-cols">
         <div class="fht-col">
           <div class="fht-col-label up">▲ Tăng</div>
-          <div class="fht-list" id="fht-list-up"></div>
+          <div class="fht-list" id="fht-list-up"><div class="fht-loading">đang tải…</div></div>
         </div>
         <div class="fht-col">
           <div class="fht-col-label down">▼ Giảm</div>
-          <div class="fht-list" id="fht-list-down"></div>
+          <div class="fht-list" id="fht-list-down"><div class="fht-loading">đang tải…</div></div>
         </div>
       </div>
     </div>
@@ -873,7 +876,14 @@ async function fetchTop100Coins() {
     updateLabelContent();
     renderTrendingPanel();
   } catch (e) {
-    // CoinGecko lỗi/rate-limit — giữ nguyên màu/nhãn hiện tại, không ảnh hưởng phần còn lại của hero
+    // Nếu chưa từng tải được lần nào (latestCoins rỗng), báo lỗi thay vì để "đang tải" mãi mãi.
+    // Nếu đã có dữ liệu từ lần fetch trước, giữ nguyên — không xoá dữ liệu cũ chỉ vì 1 lần lỗi tạm thời.
+    if (!latestCoins.length) {
+      fhtTitleEl.textContent = 'TOP BIẾN ĐỘNG · lỗi tải';
+      const msg = '<div class="fht-error">Không tải được dữ liệu CoinGecko</div>';
+      fhtListUpEl.innerHTML = msg;
+      fhtListDownEl.innerHTML = '';
+    }
   }
 }
 fetchTop100Coins();
