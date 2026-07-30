@@ -107,11 +107,14 @@
     position: absolute;
     transform: translate(-50%, -100%);
     font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
     letter-spacing: 0.5px;
     white-space: nowrap;
-    text-shadow: 0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(2,18,10,0.6);
+    border: 1px solid currentColor;
     transition: opacity 0.3s ease;
   }
 
@@ -136,13 +139,24 @@
     color: rgba(122,255,191,0.8);
     margin-bottom: 10px;
   }
+  .fht-cols { display: flex; gap: 26px; }
+  .fht-col { flex: 1; }
+  .fht-col-label {
+    font-size: 9.5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.85;
+  }
+  .fht-col-label.up { color: #7CFFB2; }
+  .fht-col-label.down { color: #FF8A80; }
   .fht-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
     font-size: 13px;
   }
-  .fht-row { display: flex; justify-content: space-between; gap: 12px; }
+  .fht-row { display: flex; justify-content: space-between; gap: 16px; }
   .fht-row .sym { color: var(--ink, #E9E8E5); font-weight: 700; }
 
   /* ===== top bar ===== */
@@ -451,8 +465,17 @@
     <div class="flow-hero-logo">CRYPTO PULSE <span>× TERMINAL</span></div>
     <div class="flow-hero-ticker" id="flow-hero-ticker">BTC —</div>
     <div class="flow-hero-trending">
-      <div class="fht-title" id="fht-title">TOP TĂNG GIÁ · 1H</div>
-      <div class="fht-list" id="fht-list"></div>
+      <div class="fht-title" id="fht-title">TOP BIẾN ĐỘNG · 1H</div>
+      <div class="fht-cols">
+        <div class="fht-col">
+          <div class="fht-col-label up">▲ Tăng</div>
+          <div class="fht-list" id="fht-list-up"></div>
+        </div>
+        <div class="fht-col">
+          <div class="fht-col-label down">▼ Giảm</div>
+          <div class="fht-list" id="fht-list-down"></div>
+        </div>
+      </div>
     </div>
     <div class="flow-hero-scrollhint">scroll ↓</div>
   </div>
@@ -509,7 +532,8 @@ const heroSpacer = document.getElementById('flow-hero-spacer');
 const heroTickerEl = document.getElementById('flow-hero-ticker');
 const heroLabelsEl = document.getElementById('flow-hero-labels');
 const fhtTitleEl = document.getElementById('fht-title');
-const fhtListEl = document.getElementById('fht-list');
+const fhtListUpEl = document.getElementById('fht-list-up');
+const fhtListDownEl = document.getElementById('fht-list-down');
 
 const renderer = new THREE.WebGL1Renderer({ canvas, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -840,25 +864,29 @@ function updateLabelContent() {
     el.style.color = chg >= 0 ? '#7CFFB2' : '#FF8A80';
   }
 }
-// Anchor point for band i on the flattened sheet (see pointsVertexShader: wp.x = x*13 + y*6,
-// wp.z = z*25; representative vertex taken at the sphere's y=0, x>0 point for that z-band).
+// Anchor point for band/theta on the flattened sheet (see pointsVertexShader: wp.x = x*13 + y*6,
+// wp.z = z*25). band picks the depth (z), theta picks WHERE on that latitude ring (x,y) —
+// without varying theta per label, every label lands on the same lateral side of the sheet.
 const SPHERE_R = 4.2;
-function bandAnchor(i, out) {
-  const band = (i + 0.5) / COIN_BANDS;
+function bandAnchor(band, theta, out) {
   const z = (band - 0.5) * 2 * SPHERE_R;
-  const x = Math.sqrt(Math.max(0, SPHERE_R * SPHERE_R - z * z));
-  out.set(x * 13.0 * scale, 0.45, z * 25.0 * scale);
+  const ringR = Math.sqrt(Math.max(0, SPHERE_R * SPHERE_R - z * z));
+  const x = ringR * Math.cos(theta), y = ringR * Math.sin(theta);
+  out.set((x * 13.0 + y * 6.0) * scale, 0.45, z * 25.0 * scale);
   return out;
 }
 const _labelAnchor = new THREE.Vector3();
 const _labelProj = new THREE.Vector3();
+const GOLDEN_ANGLE = 2.399963; // spreads labels laterally without clustering
 function updateLabelPositions() {
   for (let i = 0; i < LABEL_COUNT; i++) {
     const el = labelEls[i];
     if (!latestCoins[i]) continue;
-    // spread the 10 labels across the full depth range instead of clustering at bands 0-9
-    // (top-10-by-marketcap all live in a narrow slice of the 0-99 band range otherwise)
-    bandAnchor(i * (COIN_BANDS / LABEL_COUNT), _labelAnchor);
+    // Sample only the sub-range of the sheet that stays comfortably in view (not squeezed to
+    // the horizon, not behind the camera), so labels spread across near + far, not just far.
+    const t = LABEL_COUNT > 1 ? i / (LABEL_COUNT - 1) : 0.5;
+    const band = 0.30 + t * 0.55;
+    bandAnchor(band, i * GOLDEN_ANGLE, _labelAnchor);
     _labelProj.copy(_labelAnchor).project(camera);
     if (_labelProj.z > 1 || _labelProj.z < -1) { el.style.display = 'none'; continue; }
     const sx = (_labelProj.x * 0.5 + 0.5) * innerWidth;
@@ -877,21 +905,23 @@ const TREND_FIELDS = [
   { key: '7d',  field: 'price_change_percentage_7d_in_currency',  label: '7D' }
 ];
 let trendIdx = 0;
+function trendRow(c, field) {
+  const chg = c[field];
+  const cls = chg >= 0 ? '#7CFFB2' : '#FF8A80';
+  return `<div class="fht-row"><span class="sym">${c.symbol.toUpperCase()}</span><span style="color:${cls}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div>`;
+}
 function renderTrendingPanel() {
   if (!latestCoins.length) return;
   const tf = TREND_FIELDS[trendIdx];
-  fhtTitleEl.textContent = `TOP TĂNG GIÁ · ${tf.label}`;
-  const ranked = latestCoins
-    .filter(c => typeof c[tf.field] === 'number')
-    .sort((a, b) => b[tf.field] - a[tf.field])
-    .slice(0, 10);
-  fhtListEl.innerHTML = ranked.map(c => {
-    const chg = c[tf.field];
-    const cls = chg >= 0 ? '#7CFFB2' : '#FF8A80';
-    return `<div class="fht-row"><span class="sym">${c.symbol.toUpperCase()}</span><span style="color:${cls}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div>`;
-  }).join('');
+  fhtTitleEl.textContent = `TOP BIẾN ĐỘNG · ${tf.label}`;
+  const valid = latestCoins.filter(c => typeof c[tf.field] === 'number');
+  const gainers = [...valid].sort((a, b) => b[tf.field] - a[tf.field]).slice(0, 5);
+  const losers = [...valid].sort((a, b) => a[tf.field] - b[tf.field]).slice(0, 5);
+  fhtListUpEl.innerHTML = gainers.map(c => trendRow(c, tf.field)).join('');
+  fhtListDownEl.innerHTML = losers.map(c => trendRow(c, tf.field)).join('');
 }
-setInterval(() => { trendIdx = (trendIdx + 1) % TREND_FIELDS.length; renderTrendingPanel(); }, 5000);
+// 7s/khung — đủ thời gian đọc 5 dòng trước khi chuyển sang khung thời gian tiếp theo
+setInterval(() => { trendIdx = (trendIdx + 1) % TREND_FIELDS.length; renderTrendingPanel(); }, 7000);
 
 /* ===== scroll (relative to the hero's own spacer, not the whole page) ===== */
 let scrollTarget = 0, scrollSmooth = 0, scrollCurrent = 0;
