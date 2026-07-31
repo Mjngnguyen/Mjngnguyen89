@@ -217,7 +217,7 @@
         animation-delay: .22s;
       }
 
-      .alert-row {
+      .alert-card {
         animation: fadeInUp .35s ease both;
       }
 
@@ -489,27 +489,82 @@
       text-transform: uppercase;
     }
 
-    .alert-row {
+    .alerts-grid {
       display: grid;
-      grid-template-columns: 64px 1fr 100px 88px 90px;
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .alert-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .alert-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--dim2);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    .alert-card.is-hit {
+      border-color: rgba(74, 222, 128, 0.35);
+    }
+
+    .ac-top {
+      display: flex;
       align-items: center;
-      padding: 11px 14px;
-      border-bottom: 1px solid var(--line-soft);
-      transition: background .15s ease;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
     }
 
-    .alert-row:hover {
-      background: var(--line-soft);
+    .ac-coin {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
     }
 
-    .alert-row:last-child {
-      border-bottom: none;
-    }
-
-    .alert-row .sym {
+    .ac-avatar {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--blue-bg);
+      color: var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-weight: 800;
-      font-size: 12.5px;
+      font-size: 11px;
+    }
+
+    .ac-sym {
+      font-weight: 800;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ac-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .ac-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+      margin-top: 6px;
+      color: var(--dim);
     }
 
     .cond-chip {
@@ -528,14 +583,9 @@
       color: var(--red);
     }
 
-    .target-line {
-      font-size: 11px;
-    }
-
-    .target-line .cur {
+    .ac-foot .cur {
       color: var(--dim);
       font-size: 9.5px;
-      margin-top: 1px;
     }
 
     .progress-track {
@@ -571,12 +621,6 @@
       color: var(--green);
       background: var(--green-bg);
       cursor: pointer;
-    }
-
-    .row-actions {
-      display: flex;
-      gap: 5px;
-      justify-content: flex-end;
     }
 
     .mini-btn {
@@ -1120,32 +1164,45 @@
       const el = document.getElementById('alerts-list');
       if (!alerts.length) { el.innerHTML = '<div class="empty">Chưa có cảnh báo — bấm "+ Cảnh báo" trên thẻ coin ở trên để tạo nhanh.</div>'; return; }
       const sorted = [...alerts].sort((a, b) => b.createdAt - a.createdAt);
-      el.innerHTML = sorted.map(a => {
+      el.innerHTML = '<div class="alerts-grid">' + sorted.map(a => {
         const isIndicator = a.type === 'indicator';
         const price = currentPrices[a.symbol];
-        let condHtml, targetHtml;
+        let condCls, condLabel, progressHtml, distText;
         if (isIndicator) {
-          const cls = (a.indicator || '').includes('oversold') || a.indicator === 'golden_cross' ? 'above' : 'below';
-          condHtml = `<span class="cond-chip ${cls}">📊 ${INDICATOR_LABEL[a.indicator] || a.indicator}</span><div class="progress-track"></div>`;
-          targetHtml = `<div id="curprice-${a.id}">${fmtPrice(price)}</div><div class="cur">chỉ báo kỹ thuật</div>`;
+          condCls = (a.indicator || '').includes('oversold') || a.indicator === 'golden_cross' ? 'above' : 'below';
+          condLabel = `📊 ${INDICATOR_LABEL[a.indicator] || a.indicator}`;
+          progressHtml = '';
+          distText = 'chỉ báo kỹ thuật';
         } else {
           const dist = price !== undefined ? ((price - a.target) / a.target * 100) : undefined;
           const closeness = dist !== undefined ? Math.max(0, 100 - Math.min(Math.abs(dist), 100)) : 0;
           const barColor = closeness > 85 ? 'var(--amber)' : (a.condition === 'above' ? 'var(--green)' : 'var(--red)');
-          condHtml = `<span class="cond-chip ${a.condition}">${a.condition === 'above' ? '↑ VƯỢT' : '↓ XUỐNG'} ${fmtPrice(a.target)}</span>
-        <div class="progress-track"><div class="progress-fill" style="width:${closeness}%; background:${barColor}"></div></div>`;
-          targetHtml = `<div id="curprice-${a.id}">${fmtPrice(price)}</div><div class="cur">${dist !== undefined ? (dist >= 0 ? '+' : '') + dist.toFixed(2) + '%' : '--'}</div>`;
+          condCls = a.condition;
+          condLabel = `${a.condition === 'above' ? '↑ Vượt' : '↓ Xuống'} ${fmtPrice(a.target)}`;
+          progressHtml = `<div class="progress-track"><div class="progress-fill" style="width:${closeness}%; background:${barColor}"></div></div>`;
+          distText = dist !== undefined ? (dist >= 0 ? '+' : '') + dist.toFixed(2) + '%' : '--';
         }
-        return `<div class="alert-row" data-id="${a.id}">
-      <div class="sym">${a.symbol}</div>
-      <div>${condHtml}</div>
-      <div class="target-line">${targetHtml}</div>
-      <div>${a.triggered
+        return `<div class="alert-card${a.triggered ? ' is-hit' : ''}" data-id="${a.id}">
+      <div class="ac-top">
+        <div class="ac-coin">
+          <div class="ac-avatar">${a.symbol.slice(0, 1)}</div>
+          <div class="ac-sym">${a.symbol}</div>
+        </div>
+        <div class="ac-actions">
+          ${a.triggered
             ? `<span class="status-pill hit" onclick="rearmAlert('${a.id}')" title="Bấm để kích hoạt lại">ĐÃ BÁO ↺</span>`
-            : `<span class="status-pill waiting">ĐANG CHỜ</span>`}</div>
-      <div class="row-actions"><button class="mini-btn" onclick="deleteAlert('${a.id}')" title="Xoá">✕</button></div>
+            : `<span class="status-pill waiting">ĐANG CHỜ</span>`}
+          <button class="mini-btn" onclick="deleteAlert('${a.id}')" title="Xoá">✕</button>
+        </div>
+      </div>
+      <span class="cond-chip ${condCls}">${condLabel}</span>
+      ${progressHtml}
+      <div class="ac-foot">
+        <span id="curprice-${a.id}">${fmtPrice(price)}</span>
+        <span class="cur">${distText}</span>
+      </div>
     </div>`;
-      }).join('');
+      }).join('') + '</div>';
     }
     function deleteAlert(id) { alerts = alerts.filter(a => a.id !== id); saveAlerts(); renderAlerts(); connectWS(); }
     function rearmAlert(id) { const a = alerts.find(x => x.id === id); if (a) { a.triggered = false; saveAlerts(); renderAlerts(); } }
@@ -1248,7 +1305,7 @@
           if (tgConfig.token && tgConfig.chatId) {
             sendTelegramMessage(`⚡ <b>${a.symbol}</b> đã ${a.condition === 'above' ? 'VƯỢT TRÊN' : 'XUỐNG DƯỚI'} <b>${fmtPrice(a.target)}</b>\nGiá hiện tại: <b>${fmtPrice(price)}</b>`);
           }
-          const row = document.querySelector(`.alert-row[data-id="${a.id}"]`);
+          const row = document.querySelector(`.alert-card[data-id="${a.id}"]`);
           if (row) { row.classList.add('just-hit'); setTimeout(() => row.classList.remove('just-hit'), 3300); }
         }
       });
@@ -1308,7 +1365,7 @@
           }
         }
       }
-      document.querySelectorAll('.alert-row').forEach(row => {
+      document.querySelectorAll('.alert-card').forEach(row => {
         const id = row.dataset.id; const a = alerts.find(x => x.id === id);
         if (a && a.symbol === sym) {
           const cell = document.getElementById('curprice-' + id);
