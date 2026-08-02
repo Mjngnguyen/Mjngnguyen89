@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NHẬT KÝ GIAO DỊCH × JOURNAL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --paper: #0F1012;
+      --card: #16171B;
+      --ink: #E9E8E5;
+      --dim: #8B8D93;
+      --dim2: #5B5D63;
+      --line: #26272C;
+      --line-soft: #1D1E22;
+      --green: #4ADE80;
+      --green-bg: rgba(74, 222, 128, 0.10);
+      --red: #F87171;
+      --red-bg: rgba(248, 113, 113, 0.10);
+      --amber: #FBBF24;
+      --amber-bg: rgba(251, 191, 36, 0.10);
+      --blue: #3B9BE8;
+      --blue-bg: rgba(59, 155, 232, 0.10);
+      --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scrollbar-color: var(--line) var(--paper); }
+    body { background: var(--paper); color: var(--ink); font-family: var(--mono); font-size: 12.5px; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 40px; }
+    a { color: inherit; }
+    .up { color: var(--green); } .down { color: var(--red); }
+
+    header { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 14px; flex-wrap: wrap; gap: 10px; }
+    .brand { font-weight: 800; font-size: 14px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+    .brand .sub { color: var(--dim); font-weight: 400; font-size: 11px; }
+    .head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .nav-link { color: var(--dim); text-decoration: none; font-size: 10px; letter-spacing: 0.8px; border: 1px solid var(--line); padding: 3px 8px; border-radius: 3px; transition: color 0.15s, border-color 0.15s; }
+    .nav-link:hover { color: var(--ink); border-color: var(--dim2); }
+    .nav-link.active { color: var(--paper); background: var(--amber); border-color: var(--amber); }
+
+    .section-label { font-size: 10px; letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; margin: 22px 0 10px; display: flex; align-items: center; justify-content: space-between; }
+
+    .jr-toolbar { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; flex-wrap: wrap; gap: 12px; }
+    .jr-toolbar .settings-line { display: flex; gap: 20px; flex-wrap: wrap; font-size: 11px; color: var(--dim); }
+    .jr-toolbar .settings-line b { color: var(--ink); }
+    .btn { font-family: var(--mono); border-radius: 8px; padding: 8px 14px; font-size: 11px; cursor: pointer; font-weight: 700; border: none; }
+    .btn.primary { background: var(--amber); color: #241a02; }
+    .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+    .btn.danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-edit-settings { background: transparent; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+    .stat-tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .stat-tile .lbl { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+    .stat-tile .val { font-size: 18px; font-weight: 800; }
+
+    .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 780px) { .charts-row { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .panel-title { font-size: 10px; letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; margin-bottom: 10px; }
+    #equity-chart { width: 100%; height: 200px; display: block; }
+    #wl-donut { width: 100%; height: 160px; display: block; }
+    .donut-legend { display: flex; gap: 14px; justify-content: center; font-size: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .donut-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    .perf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .perf-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .perf-card .name { font-weight: 800; font-size: 12.5px; margin-bottom: 6px; }
+    .perf-card .pnl { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+    .perf-card .meta { font-size: 10px; color: var(--dim); display: flex; justify-content: space-between; }
+    .perf-card.empty { color: var(--dim2); font-size: 10.5px; }
+
+    .trades-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+    .trades-toolbar input, .trades-toolbar select {
+      font-family: var(--mono); background: var(--card); color: var(--ink); border: 1px solid var(--line);
+      border-radius: 6px; padding: 6px 10px; font-size: 10.5px;
+    }
+    .trades-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+    .trade-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .trade-card:hover { transform: translateY(-2px); border-color: var(--dim2); box-shadow: 0 6px 18px rgba(0,0,0,0.28); }
+    .trade-card.win { border-left: 3px solid var(--green); }
+    .trade-card.loss { border-left: 3px solid var(--red); }
+    .trade-card.be { border-left: 3px solid var(--dim2); }
+    .tc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .tc-pair { font-weight: 800; font-size: 13px; }
+    .tc-dir { font-size: 9px; padding: 2px 6px; border-radius: 10px; font-weight: 700; letter-spacing: 0.3px; }
+    .tc-dir.long { color: var(--green); background: var(--green-bg); }
+    .tc-dir.short { color: var(--red); background: var(--red-bg); }
+    .tc-date { font-size: 9.5px; color: var(--dim2); margin-bottom: 8px; }
+    .tc-pnl { font-size: 17px; font-weight: 800; }
+    .tc-meta { font-size: 10px; color: var(--dim); margin-top: 4px; display: flex; justify-content: space-between; }
+    .empty { padding: 34px 16px; text-align: center; color: var(--dim); font-size: 11px; grid-column: 1/-1; }
+
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: flex-start; justify-content: center; padding: 5vh 16px; overflow-y: auto; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--line); border-radius: 12px; width: min(720px, 100%); padding: 20px; margin-bottom: 40px; }
+    .modal h3 { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .modal h3 .x { cursor: pointer; color: var(--dim2); font-size: 18px; }
+    .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .field label { display: block; font-size: 9.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .field input, .field select, .field textarea {
+      width: 100%; font-family: var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+      border-radius: 6px; padding: 7px 9px; font-size: 11px;
+    }
+    .field textarea { resize: vertical; min-height: 50px; }
+    .field.full { grid-column: 1 / -1; }
+    .chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; margin-bottom: 14px; }
+    .chk-item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; cursor: pointer; }
+    .chk-item input { accent-color: var(--amber); }
+    .grade-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .grade-btn { font-family: var(--mono); font-size: 10.5px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--paper); color: var(--dim); cursor: pointer; }
+    .grade-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(251,191,36,0.08); }
+    .feedback-box { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: 11px; }
+    .feedback-box .ft-title { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+    .feedback-box .fb-good { color: var(--green); margin-bottom: 3px; }
+    .feedback-box .fb-bad { color: var(--red); margin-bottom: 3px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+    .modal-actions .spacer { flex: 1; }
+
+    footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 10px; color: var(--dim2); line-height: 1.6; }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">📓 NHẬT KÝ <span class="sub">× JOURNAL</span></div>
+    <div class="head-right">
+      <a href="/" class="nav-link">📊 DASHBOARD</a>
+      <a href="/backtest" class="nav-link">🧪 BACKTEST</a>
+      <a href="/alert" class="nav-link">⚡ ALERT</a>
+      <a href="/journal" class="nav-link active">📓 JOURNAL</a>
+      <span class="nav-link" id="server-status" title="Đồng bộ với server">🖥 Đang kiểm tra…</span>
+    </div>
+  </header>
+
+  <div class="jr-toolbar">
+    <div class="settings-line">
+      <span>Số dư ban đầu <b id="disp-balance">$0</b></span>
+      <span>1R = <b id="disp-rvalue">$0</b> (<span id="disp-rpercent">1</span>%)</span>
+      <button class="btn-edit-settings" onclick="openSettings()" title="Sửa số dư / R">⚙</button>
+    </div>
+    <button class="btn primary" onclick="openTradeModal()">+ Thêm giao dịch</button>
+  </div>
+
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-title">Đường cong vốn</div>
+      <svg id="equity-chart" viewBox="0 0 900 200" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Thắng / Thua</div>
+      <svg id="wl-donut" viewBox="0 0 160 160"></svg>
+      <div class="donut-legend" id="wl-legend"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Hiệu suất theo coin</div>
+  <div class="perf-grid" id="perf-pair"></div>
+
+  <div class="section-label">Hiệu suất theo thứ</div>
+  <div class="perf-grid" id="perf-weekday"></div>
+
+  <div class="section-label">
+    <span>Nhật ký giao dịch (<span id="trade-count">0</span>)</span>
+  </div>
+  <div class="trades-toolbar">
+    <input type="text" id="search-input" placeholder="Tìm theo coin, setup, ghi chú…" style="min-width:200px;" oninput="renderTrades()">
+    <select id="filter-result" onchange="renderTrades()">
+      <option value="">Tất cả kết quả</option>
+      <option value="win">Thắng</option>
+      <option value="loss">Thua</option>
+      <option value="be">Hoà vốn</option>
+    </select>
+    <select id="filter-pair" onchange="renderTrades()">
+      <option value="">Tất cả coin</option>
+    </select>
+  </div>
+  <div class="trades-grid" id="trades-list"></div>
+
+  <footer>
+    Nhật ký giao dịch cá nhân — dữ liệu lưu tại trình duyệt (localStorage) và đồng bộ server (Upstash Redis) qua cùng API key với trang Alert.
+    Phần "nhận xét tự động" là logic dựa trên checklist kỷ luật bạn tự đánh dấu, không phải mô hình AI thật.
+  </footer>
+</div>
+
+<!-- ===== Modal: thêm/sửa giao dịch ===== -->
+<div class="modal-backdrop" id="trade-modal-backdrop" onclick="if(event.target===this) closeTradeModal()">
+  <div class="modal">
+    <h3><span id="trade-modal-title">Thêm giao dịch</span> <span class="x" onclick="closeTradeModal()">✕</span></h3>
+
+    <div class="field-grid">
+      <div class="field"><label>Ngày</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Coin</label><input type="text" id="f-pair" placeholder="BTC/USDT" style="text-transform:uppercase;"></div>
+      <div class="field"><label>Hướng</label>
+        <select id="f-direction"><option value="long">Long</option><option value="short">Short</option></select>
+      </div>
+      <div class="field"><label>Khung thời gian</label><input type="text" id="f-tf" placeholder="H1"></div>
+      <div class="field"><label>Entry</label><input type="number" id="f-entry" step="any"></div>
+      <div class="field"><label>Stop Loss</label><input type="number" id="f-sl" step="any"></div>
+      <div class="field"><label>Take Profit</label><input type="number" id="f-tp" step="any"></div>
+      <div class="field"><label>Exit</label><input type="number" id="f-exit" step="any"></div>
+      <div class="field"><label>Lãi/Lỗ ($)</label><input type="number" id="f-pnl" step="any"></div>
+      <div class="field"><label>Kết quả</label>
+        <select id="f-result"><option value="win">Thắng</option><option value="loss">Thua</option><option value="be">Hoà vốn</option></select>
+      </div>
+      <div class="field"><label>Setup</label><input type="text" id="f-setup" placeholder="Breakout, Reversal…"></div>
+      <div class="field"><label>Tâm lý</label>
+        <select id="f-psychology">
+          <option>Rất bình tĩnh</option><option>Bình tĩnh</option><option>Lo lắng</option><option>FOMO</option><option>Revenge</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field full" style="margin-bottom:14px;">
+      <label>Checklist kỷ luật</label>
+      <div class="chk-grid">
+        <label class="chk-item"><input type="checkbox" id="d-plan"> Tuân thủ kế hoạch</label>
+        <label class="chk-item"><input type="checkbox" id="d-nofomo"> Không FOMO</label>
+        <label class="chk-item"><input type="checkbox" id="d-norevenge"> Không revenge trade</label>
+        <label class="chk-item"><input type="checkbox" id="d-noovertrade"> Không overtrade</label>
+        <label class="chk-item"><input type="checkbox" id="d-screenshot"> Có screenshot</label>
+        <label class="chk-item"><input type="checkbox" id="d-review"> Có review sau lệnh</label>
+      </div>
+    </div>
+
+    <div class="field full" style="margin-bottom:8px;">
+      <label>Tự chấm điểm lệnh</label>
+      <div class="grade-row" id="grade-row">
+        <button type="button" class="grade-btn" data-grade="good-win" onclick="setGrade('good-win')">👍 Tốt - Thắng</button>
+        <button type="button" class="grade-btn" data-grade="good-loss" onclick="setGrade('good-loss')">🤝 Tốt - Thua (đúng kế hoạch)</button>
+        <button type="button" class="grade-btn" data-grade="bad-win" onclick="setGrade('bad-win')">⚠️ Xấu - Thắng (may mắn)</button>
+        <button type="button" class="grade-btn" data-grade="bad-loss" onclick="setGrade('bad-loss')">👎 Xấu - Thua</button>
+      </div>
+    </div>
+
+    <div class="field-grid">
+      <div class="field full"><label>Lý do vào lệnh</label><textarea id="f-reason"></textarea></div>
+      <div class="field full"><label>Ghi chú / Review</label><textarea id="f-review"></textarea></div>
+      <div class="field full"><label>Ảnh (dán URL, cách nhau bằng dấu phẩy)</label><input type="text" id="f-screenshots" placeholder="https://..., https://..."></div>
+    </div>
+
+    <div class="feedback-box" id="feedback-box" style="display:none;">
+      <div class="ft-title">Nhận xét tự động (dựa trên checklist)</div>
+      <div id="feedback-content"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn danger" id="btn-delete-trade" onclick="deleteCurrentTrade()" style="display:none;">Xoá</button>
+      <button class="btn ghost" id="btn-duplicate-trade" onclick="duplicateCurrentTrade()" style="display:none;">Duplicate</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" onclick="closeTradeModal()">Huỷ</button>
+      <button class="btn primary" onclick="saveTrade()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: cài đặt số dư / R ===== -->
+<div class="modal-backdrop" id="settings-modal-backdrop" onclick="if(event.target===this) closeSettings()">
+  <div class="modal" style="width:min(360px,100%);">
+    <h3>Cài đặt <span class="x" onclick="closeSettings()">✕</span></h3>
+    <div class="field" style="margin-bottom:10px;"><label>Số dư ban đầu ($)</label><input type="number" id="s-balance" step="any"></div>
+    <div class="field" style="margin-bottom:14px;"><label>1R = % số dư</label><input type="number" id="s-rpercent" step="any"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="saveSettings()">Lưu</button></div>
+  </div>
+</div>
+
+<script>
+let trades = JSON.parse(localStorage.getItem('jr_trades') || '[]');
+let settings = JSON.parse(localStorage.getItem('jr_settings') || '{"balance":10000,"rPercent":1}');
+let apiSecret = localStorage.getItem('pa_api_secret') || '';
+let editingId = null;
+let currentGrade = '';
+
+function saveLocal() {
+  localStorage.setItem('jr_trades', JSON.stringify(trades));
+  localStorage.setItem('jr_settings', JSON.stringify(settings));
+}
+function saveAll() { saveLocal(); syncToServer(); }
+
+let syncTimer = null;
+function syncToServer() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiSecret },
+        body: JSON.stringify({ trades, settings })
+      });
+      if (!res.ok) throw new Error(res.status === 401 ? 'unauthorized' : 'HTTP ' + res.status);
+      setServerStatus(true);
+    } catch (e) { setServerStatus(false, e.message === 'unauthorized'); }
+  }, 500);
+}
+async function pullFromServer() {
+  try {
+    const res = await fetch('/api/journal', { headers: { 'x-api-key': apiSecret } });
+    if (!res.ok) throw new Error(res.status === 401 ? 'unauthorized' : 'HTTP ' + res.status);
+    const data = await res.json();
+    setServerStatus(true);
+    if (data.trades && data.trades.length && !trades.length) {
+      trades = data.trades;
+      if (data.settings && data.settings.balance) settings = data.settings;
+      saveLocal();
+      renderAll();
+    }
+  } catch (e) { setServerStatus(false, e.message === 'unauthorized'); }
+}
+function setServerStatus(ok, unauthorized) {
+  const el = document.getElementById('server-status');
+  el.textContent = ok ? '🖥 Đồng bộ: hoạt động' : (unauthorized ? '🖥 Sai API Secret' : '🖥 Chưa kết nối');
+  el.style.color = ok ? 'var(--green)' : (unauthorized ? 'var(--red)' : 'var(--dim)');
+}
+
+/* ============================================================ CÀI ĐẶT ============================================================ */
+function openSettings() {
+  document.getElementById('s-balance').value = settings.balance || 10000;
+  document.getElementById('s-rpercent').value = settings.rPercent || 1;
+  document.getElementById('settings-modal-backdrop').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-modal-backdrop').classList.remove('open'); }
+function saveSettings() {
+  settings.balance = parseFloat(document.getElementById('s-balance').value) || 0;
+  settings.rPercent = parseFloat(document.getElementById('s-rpercent').value) || 1;
+  saveAll();
+  renderAll();
+  closeSettings();
+}
+function rValue() { return (settings.balance || 0) * (settings.rPercent || 1) / 100; }
+function fmtMoney(n) {
+  if (n === undefined || n === null || isNaN(n)) return '--';
+  const sign = n >= 0 ? '' : '-';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* ============================================================ CRUD GIAO DỊCH ============================================================ */
+function openTradeModal(id) {
+  editingId = id || null;
+  currentGrade = '';
+  const t = id ? trades.find(x => x.id === id) : null;
+  document.getElementById('trade-modal-title').textContent = id ? 'Sửa giao dịch' : 'Thêm giao dịch';
+  document.getElementById('f-date').value = t ? t.date : new Date().toISOString().slice(0, 10);
+  document.getElementById('f-pair').value = t ? t.pair : '';
+  document.getElementById('f-direction').value = t ? t.direction : 'long';
+  document.getElementById('f-tf').value = t ? t.tf || '' : '';
+  document.getElementById('f-entry').value = t ? t.entry ?? '' : '';
+  document.getElementById('f-sl').value = t ? t.sl ?? '' : '';
+  document.getElementById('f-tp').value = t ? t.tp ?? '' : '';
+  document.getElementById('f-exit').value = t ? t.exit ?? '' : '';
+  document.getElementById('f-pnl').value = t ? t.pnl ?? '' : '';
+  document.getElementById('f-result').value = t ? t.result : 'win';
+  document.getElementById('f-setup').value = t ? t.setup || '' : '';
+  document.getElementById('f-psychology').value = t ? t.psychology || 'Bình tĩnh' : 'Bình tĩnh';
+  const d = (t && t.discipline) || {};
+  document.getElementById('d-plan').checked = !!d.plan;
+  document.getElementById('d-nofomo').checked = !!d.noFomo;
+  document.getElementById('d-norevenge').checked = !!d.noRevenge;
+  document.getElementById('d-noovertrade').checked = !!d.noOvertrade;
+  document.getElementById('d-screenshot').checked = !!d.screenshot;
+  document.getElementById('d-review').checked = !!d.review;
+  document.getElementById('f-reason').value = t ? t.reason || '' : '';
+  document.getElementById('f-review').value = t ? t.review || '' : '';
+  document.getElementById('f-screenshots').value = t ? (t.screenshots || []).join(', ') : '';
+  setGrade(t ? t.grade || '' : '');
+  document.getElementById('btn-delete-trade').style.display = id ? 'inline-block' : 'none';
+  document.getElementById('btn-duplicate-trade').style.display = id ? 'inline-block' : 'none';
+  renderFeedbackPreview();
+  document.getElementById('trade-modal-backdrop').classList.add('open');
+}
+function closeTradeModal() { document.getElementById('trade-modal-backdrop').classList.remove('open'); }
+function setGrade(g) {
+  currentGrade = currentGrade === g ? '' : g;
+  document.querySelectorAll('.grade-btn').forEach(b => b.classList.toggle('active', b.dataset.grade === currentGrade));
+  renderFeedbackPreview();
+}
+
+const DISCIPLINE_LABELS = {
+  plan: 'Tuân thủ đúng kế hoạch đã đặt ra',
+  noFomo: 'Không bị FOMO chi phối quyết định',
+  noRevenge: 'Không revenge trade để gỡ lỗ',
+  noOvertrade: 'Không overtrade — tôn trọng giới hạn số lệnh',
+  screenshot: 'Lưu screenshot làm dữ liệu review',
+  review: 'Có ghi review sau lệnh'
+};
+function renderFeedbackPreview() {
+  const d = {
+    plan: document.getElementById('d-plan').checked,
+    noFomo: document.getElementById('d-nofomo').checked,
+    noRevenge: document.getElementById('d-norevenge').checked,
+    noOvertrade: document.getElementById('d-noovertrade').checked,
+    screenshot: document.getElementById('d-screenshot').checked,
+    review: document.getElementById('d-review').checked
+  };
+  const good = Object.keys(d).filter(k => d[k]);
+  const bad = Object.keys(d).filter(k => !d[k]);
+  const box = document.getElementById('feedback-box');
+  const content = document.getElementById('feedback-content');
+  if (!good.length && !bad.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  content.innerHTML =
+    good.map(k => `<div class="fb-good">✓ ${DISCIPLINE_LABELS[k]}</div>`).join('') +
+    bad.map(k => `<div class="fb-bad">✗ Thiếu: ${DISCIPLINE_LABELS[k]}</div>`).join('');
+}
+['d-plan', 'd-nofomo', 'd-norevenge', 'd-noovertrade', 'd-screenshot', 'd-review'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderFeedbackPreview);
+});
+
+function saveTrade() {
+  const pair = document.getElementById('f-pair').value.trim().toUpperCase();
+  if (!pair) { alert('Nhập coin.'); return; }
+  const t = {
+    id: editingId || (Date.now() + Math.random().toString(16).slice(2)),
+    createdAt: editingId ? (trades.find(x => x.id === editingId)?.createdAt || Date.now()) : Date.now(),
+    date: document.getElementById('f-date').value || new Date().toISOString().slice(0, 10),
+    pair, direction: document.getElementById('f-direction').value,
+    tf: document.getElementById('f-tf').value.trim(),
+    entry: parseFloat(document.getElementById('f-entry').value) || undefined,
+    sl: parseFloat(document.getElementById('f-sl').value) || undefined,
+    tp: parseFloat(document.getElementById('f-tp').value) || undefined,
+    exit: parseFloat(document.getElementById('f-exit').value) || undefined,
+    pnl: parseFloat(document.getElementById('f-pnl').value) || 0,
+    result: document.getElementById('f-result').value,
+    setup: document.getElementById('f-setup').value.trim(),
+    psychology: document.getElementById('f-psychology').value,
+    discipline: {
+      plan: document.getElementById('d-plan').checked,
+      noFomo: document.getElementById('d-nofomo').checked,
+      noRevenge: document.getElementById('d-norevenge').checked,
+      noOvertrade: document.getElementById('d-noovertrade').checked,
+      screenshot: document.getElementById('d-screenshot').checked,
+      review: document.getElementById('d-review').checked
+    },
+    grade: currentGrade,
+    reason: document.getElementById('f-reason').value.trim(),
+    review: document.getElementById('f-review').value.trim(),
+    screenshots: document.getElementById('f-screenshots').value.split(',').map(s => s.trim()).filter(Boolean)
+  };
+  if (editingId) {
+    const idx = trades.findIndex(x => x.id === editingId);
+    trades[idx] = t;
+  } else {
+    trades.push(t);
+  }
+  saveAll();
+  closeTradeModal();
+  renderAll();
+}
+function deleteCurrentTrade() {
+  if (!editingId) return;
+  if (!confirm('Xoá giao dịch này?')) return;
+  trades = trades.filter(x => x.id !== editingId);
+  saveAll();
+  closeTradeModal();
+  renderAll();
+}
+function duplicateCurrentTrade() {
+  if (!editingId) return;
+  const t = trades.find(x => x.id === editingId);
+  if (!t) return;
+  const copy = { ...t, id: Date.now() + Math.random().toString(16).slice(2), createdAt: Date.now(), date: new Date().toISOString().slice(0, 10) };
+  trades.push(copy);
+  saveAll();
+  closeTradeModal();
+  renderAll();
+}
+
+/* ============================================================ TÍNH TOÁN THỐNG KÊ ============================================================ */
+function computeStats(list) {
+  const n = list.length;
+  const wins = list.filter(t => t.result === 'win');
+  const losses = list.filter(t => t.result === 'loss');
+  const bes = list.filter(t => t.result === 'be');
+  const netPnl = list.reduce((s, t) => s + (t.pnl || 0), 0);
+  const grossWin = wins.reduce((s, t) => s + Math.max(0, t.pnl || 0), 0);
+  const grossLoss = Math.abs(losses.reduce((s, t) => s + Math.min(0, t.pnl || 0), 0));
+  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0);
+  const winRate = n ? (wins.length / n * 100) : 0;
+  const best = n ? Math.max(...list.map(t => t.pnl || 0)) : 0;
+  const worst = n ? Math.min(...list.map(t => t.pnl || 0)) : 0;
+  const sorted = [...list].sort((a, b) => new Date(a.date) - new Date(b.date) || a.createdAt - b.createdAt);
+  let streak = 0;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const r = sorted[i].result;
+    if (r === 'be') break;
+    if (streak === 0) { streak = r === 'win' ? 1 : -1; }
+    else if ((streak > 0 && r === 'win') || (streak < 0 && r === 'loss')) { streak += streak > 0 ? 1 : -1; }
+    else break;
+  }
+  const disciplineScores = list.map(t => {
+    const d = t.discipline || {};
+    const keys = Object.keys(d);
+    if (!keys.length) return null;
+    return keys.filter(k => d[k]).length / keys.length;
+  }).filter(v => v !== null);
+  const disciplineRate = disciplineScores.length ? (disciplineScores.reduce((a, b) => a + b, 0) / disciplineScores.length * 100) : null;
+  return { n, winRate, profitFactor, netPnl, best, worst, streak, disciplineRate };
+}
+
+function renderStats() {
+  const s = computeStats(trades);
+  const tiles = [
+    { lbl: 'Tổng số lệnh', val: s.n },
+    { lbl: 'Tỷ lệ thắng', val: s.n ? s.winRate.toFixed(1) + '%' : '--', cls: s.winRate >= 50 ? 'up' : 'down' },
+    { lbl: 'Profit Factor', val: isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : '∞' },
+    { lbl: 'Lãi ròng', val: fmtMoney(s.netPnl), cls: s.netPnl >= 0 ? 'up' : 'down' },
+    { lbl: 'Lệnh thắng lớn nhất', val: fmtMoney(s.best), cls: 'up' },
+    { lbl: 'Lệnh thua lớn nhất', val: fmtMoney(s.worst), cls: 'down' },
+    { lbl: 'Chuỗi hiện tại', val: s.n ? (s.streak >= 0 ? '+' : '') + s.streak : '--', cls: s.streak >= 0 ? 'up' : 'down' },
+    { lbl: 'Tỷ lệ tuân thủ kỷ luật', val: s.disciplineRate !== null ? s.disciplineRate.toFixed(0) + '%' : '--' }
+  ];
+  document.getElementById('stats-grid').innerHTML = tiles.map(t =>
+    `<div class="stat-tile"><div class="lbl">${t.lbl}</div><div class="val ${t.cls || ''}">${t.val}</div></div>`
+  ).join('');
+}
+
+function renderEquityChart() {
+  const svg = document.getElementById('equity-chart');
+  const sorted = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date) || a.createdAt - b.createdAt);
+  if (!sorted.length) { svg.innerHTML = ''; return; }
+  let cum = 0;
+  const pts = sorted.map(t => { cum += (t.pnl || 0); return cum; });
+  const w = 900, h = 200, pad = 10;
+  const min = Math.min(0, ...pts), max = Math.max(0, ...pts);
+  const range = (max - min) || 1;
+  const step = (w - pad * 2) / (pts.length - 1 || 1);
+  const toY = v => h - pad - ((v - min) / range) * (h - pad * 2);
+  const zeroY = toY(0);
+  const line = pts.map((v, i) => `${(pad + i * step).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  svg.innerHTML = `
+    <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="#26272C" stroke-width="1" stroke-dasharray="3 3"/>
+    <polyline points="${line}" fill="none" stroke="${cum >= 0 ? '#4ADE80' : '#F87171'}" stroke-width="2"/>
+  `;
+}
+
+function renderDonut() {
+  const wins = trades.filter(t => t.result === 'win').length;
+  const losses = trades.filter(t => t.result === 'loss').length;
+  const bes = trades.filter(t => t.result === 'be').length;
+  const total = wins + losses + bes;
+  const svg = document.getElementById('wl-donut');
+  const legend = document.getElementById('wl-legend');
+  if (!total) { svg.innerHTML = ''; legend.innerHTML = ''; return; }
+  const r = 60, cx = 80, cy = 80, cw = 18;
+  const segs = [
+    { v: wins, color: '#4ADE80', label: 'Thắng' },
+    { v: losses, color: '#F87171', label: 'Thua' },
+    { v: bes, color: '#8B8D93', label: 'Hoà' }
+  ];
+  let angle = -90;
+  const circumference = 2 * Math.PI * r;
+  const paths = segs.filter(s => s.v > 0).map(s => {
+    const frac = s.v / total;
+    const dash = frac * circumference;
+    const dashArray = `${dash} ${circumference - dash}`;
+    const rot = angle;
+    angle += frac * 360;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${cw}" stroke-dasharray="${dashArray}" transform="rotate(${rot} ${cx} ${cy})"/>`;
+  }).join('');
+  svg.innerHTML = paths + `<text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#E9E8E5" font-size="20" font-weight="800" font-family="monospace">${(wins/total*100).toFixed(0)}%</text><text x="${cx}" y="${cy+12}" text-anchor="middle" fill="#8B8D93" font-size="9" font-family="monospace">WINRATE</text>`;
+  legend.innerHTML = segs.map(s => `<span><span class="dot" style="background:${s.color}"></span>${s.label} (${s.v})</span>`).join('');
+}
+
+function renderPerfByPair() {
+  const groups = {};
+  trades.forEach(t => { (groups[t.pair] = groups[t.pair] || []).push(t); });
+  const pairs = Object.keys(groups).sort();
+  const el = document.getElementById('perf-pair');
+  if (!pairs.length) { el.innerHTML = '<div class="perf-card empty">Chưa có dữ liệu</div>'; return; }
+  el.innerHTML = pairs.map(p => {
+    const s = computeStats(groups[p]);
+    return `<div class="perf-card">
+      <div class="name">${p}</div>
+      <div class="pnl ${s.netPnl >= 0 ? 'up' : 'down'}">${fmtMoney(s.netPnl)}</div>
+      <div class="meta"><span>${s.n} lệnh</span><span>${s.winRate.toFixed(0)}% thắng</span></div>
+    </div>`;
+  }).join('');
+
+  const filterSel = document.getElementById('filter-pair');
+  const current = filterSel.value;
+  filterSel.innerHTML = '<option value="">Tất cả coin</option>' + pairs.map(p => `<option value="${p}">${p}</option>`).join('');
+  filterSel.value = current;
+}
+
+const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+function renderPerfByWeekday() {
+  const groups = {};
+  trades.forEach(t => {
+    const d = new Date(t.date);
+    if (isNaN(d)) return;
+    const wd = d.getDay();
+    (groups[wd] = groups[wd] || []).push(t);
+  });
+  const el = document.getElementById('perf-weekday');
+  const days = [1, 2, 3, 4, 5, 0, 6].filter(d => groups[d]);
+  if (!days.length) { el.innerHTML = '<div class="perf-card empty">Chưa có dữ liệu</div>'; return; }
+  el.innerHTML = days.map(d => {
+    const s = computeStats(groups[d]);
+    return `<div class="perf-card">
+      <div class="name">${WEEKDAY_LABELS[d]}</div>
+      <div class="pnl ${s.netPnl >= 0 ? 'up' : 'down'}">${fmtMoney(s.netPnl)}</div>
+      <div class="meta"><span>${s.n} lệnh</span><span>${s.winRate.toFixed(0)}% thắng</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderTrades() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const filterResult = document.getElementById('filter-result').value;
+  const filterPair = document.getElementById('filter-pair').value;
+  let list = [...trades].sort((a, b) => new Date(b.date) - new Date(a.date) || b.createdAt - a.createdAt);
+  if (filterResult) list = list.filter(t => t.result === filterResult);
+  if (filterPair) list = list.filter(t => t.pair === filterPair);
+  if (search) list = list.filter(t =>
+    (t.pair || '').toLowerCase().includes(search) ||
+    (t.setup || '').toLowerCase().includes(search) ||
+    (t.review || '').toLowerCase().includes(search) ||
+    (t.reason || '').toLowerCase().includes(search)
+  );
+  document.getElementById('trade-count').textContent = trades.length;
+  const el = document.getElementById('trades-list');
+  if (!list.length) { el.innerHTML = '<div class="empty">Chưa có giao dịch nào — bấm "+ Thêm giao dịch" để bắt đầu.</div>'; return; }
+  el.innerHTML = list.map(t => {
+    const rr = (t.entry && t.sl && t.tp) ? (Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl)).toFixed(2) : '--';
+    const rMult = rValue() > 0 ? (t.pnl / rValue()).toFixed(2) + 'R' : '--';
+    return `<div class="trade-card ${t.result}" onclick="openTradeModal('${t.id}')">
+      <div class="tc-top">
+        <span class="tc-pair">${t.pair}</span>
+        <span class="tc-dir ${t.direction}">${t.direction === 'long' ? 'LONG' : 'SHORT'}</span>
+      </div>
+      <div class="tc-date">${t.date}${t.setup ? ' · ' + t.setup : ''}</div>
+      <div class="tc-pnl ${t.pnl >= 0 ? 'up' : 'down'}">${fmtMoney(t.pnl)}</div>
+      <div class="tc-meta"><span>RR kế hoạch ${rr}</span><span>${rMult}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderAll() {
+  document.getElementById('disp-balance').textContent = fmtMoney(settings.balance || 0);
+  document.getElementById('disp-rvalue').textContent = fmtMoney(rValue());
+  document.getElementById('disp-rpercent').textContent = settings.rPercent || 1;
+  renderStats();
+  renderEquityChart();
+  renderDonut();
+  renderPerfByPair();
+  renderPerfByWeekday();
+  renderTrades();
+}
+
+renderAll();
+pullFromServer();
+</script>
+</body>
+</html>
