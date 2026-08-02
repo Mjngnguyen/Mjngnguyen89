@@ -162,6 +162,10 @@
     flex-direction: column;
     gap: 5px;
     font-size: 13px;
+    max-height: 34vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
   }
   .fht-row { display: flex; justify-content: space-between; gap: 8px; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; transition: background 0.15s ease; min-width: 0; }
   .fht-row:hover { background: rgba(122,255,191,0.12); }
@@ -180,7 +184,7 @@
     .flow-hero-ticker { font-size: 12px; }
     .flow-hero-trending { left: 16px; bottom: 52px; padding: 12px 14px; min-width: 0; width: calc(100vw - 32px); max-width: calc(100vw - 32px); }
     .fht-cols { gap: 14px; }
-    .fht-list { font-size: 11.5px; }
+    .fht-list { font-size: 11.5px; max-height: 28vh; }
     .fht-row .sym { max-width: 6ch; }
     .flow-hero-label { font-size: 10px; padding: 1px 6px; }
   }
