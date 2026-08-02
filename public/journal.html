@@ -77,6 +77,30 @@
     .perf-card .meta { font-size: 10px; color: var(--dim); display: flex; justify-content: space-between; }
     .perf-card.empty { color: var(--dim2); font-size: 10.5px; }
 
+    /* ===== Lịch giao dịch ===== */
+    .cal-nav { display: flex; align-items: center; gap: 8px; }
+    .cal-nav-btn { background: var(--paper); border: 1px solid var(--line); color: var(--ink); border-radius: 6px; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
+    .cal-nav-btn:hover { border-color: var(--dim2); }
+    .cal-month-label { font-size: 11.5px; font-weight: 700; min-width: 90px; text-align: center; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-head { font-size: 9px; color: var(--dim); text-align: center; padding: 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cal-day { min-height: 58px; border-radius: 6px; padding: 6px; font-size: 10px; background: var(--paper); border: 1px solid var(--line); }
+    .cal-day.empty-cell { background: transparent; border: none; }
+    .cal-day.has-trades { cursor: pointer; }
+    .cal-day.has-trades:hover { border-color: var(--dim2); }
+    .cal-day.today { border-color: var(--amber); }
+    .cal-day .dn { color: var(--dim); font-size: 9.5px; }
+    .cal-day .pl { font-weight: 800; font-size: 11.5px; margin-top: 4px; }
+    .cal-day .cnt { color: var(--dim); font-size: 9px; }
+    .day-filter-chip { display: none; align-items: center; gap: 6px; background: var(--amber-bg); color: var(--amber); border-radius: 20px; padding: 4px 10px; font-size: 10px; cursor: pointer; }
+    .day-filter-chip.show { display: inline-flex; }
+
+    /* ===== Bản đồ nhiệt ===== */
+    .hm-grid { display: grid; gap: 3px; font-size: 9.5px; }
+    .hm-head { text-align: center; color: var(--dim); font-size: 9px; padding: 4px 0; text-transform: uppercase; }
+    .hm-row-label { font-size: 10px; font-weight: 700; display: flex; align-items: center; padding-right: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hm-cell { text-align: center; padding: 10px 2px; border-radius: 4px; font-weight: 700; color: var(--ink); }
+
     .trades-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
     .trades-toolbar input, .trades-toolbar select {
       font-family: var(--mono); background: var(--card); color: var(--ink); border: 1px solid var(--line);
@@ -172,6 +196,23 @@
   <div class="perf-grid" id="perf-weekday"></div>
 
   <div class="section-label">
+    <span>Lịch giao dịch</span>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+      <span class="cal-month-label" id="cal-month-label"></span>
+      <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <div class="section-label">Bản đồ nhiệt · Coin × Thứ (lãi/lỗ ròng)</div>
+  <div class="panel" style="overflow-x:auto;">
+    <div id="heatmap-grid"></div>
+  </div>
+
+  <div class="section-label">
     <span>Nhật ký giao dịch (<span id="trade-count">0</span>)</span>
   </div>
   <div class="trades-toolbar">
@@ -185,6 +226,7 @@
     <select id="filter-pair" onchange="renderTrades()">
       <option value="">Tất cả coin</option>
     </select>
+    <span class="day-filter-chip" id="day-filter-chip" onclick="clearDayFilter()">📅 <span id="day-filter-label"></span> ✕</span>
   </div>
   <div class="trades-grid" id="trades-list"></div>
 
@@ -614,11 +656,107 @@ function renderPerfByWeekday() {
   }).join('');
 }
 
+/* ============================================================ LỊCH GIAO DỊCH ============================================================ */
+let calYear, calMonth, calDayFilter = null;
+function initCalendar() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+}
+function calNav(delta) {
+  calMonth += delta;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+const MONTH_LABELS = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+function renderCalendar() {
+  document.getElementById('cal-month-label').textContent = `${MONTH_LABELS[calMonth]} ${calYear}`;
+  const firstDay = new Date(calYear, calMonth, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7; // 0 = Thứ 2
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const byDate = {};
+  trades.forEach(t => {
+    const d = new Date(t.date);
+    if (!isNaN(d) && d.getFullYear() === calYear && d.getMonth() === calMonth) {
+      const key = d.getDate();
+      (byDate[key] = byDate[key] || []).push(t);
+    }
+  });
+  const maxAbs = Math.max(1, ...Object.values(byDate).map(list => Math.abs(list.reduce((s, t) => s + (t.pnl || 0), 0))));
+  const heads = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  let html = heads.map(h => `<div class="cal-head">${h}</div>`).join('');
+  for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty-cell"></div>';
+  const todayStr = new Date().toDateString();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dayTrades = byDate[day] || [];
+    const pnl = dayTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const isToday = new Date(calYear, calMonth, day).toDateString() === todayStr;
+    let bg = '';
+    if (dayTrades.length) {
+      const alpha = 0.12 + 0.45 * (Math.abs(pnl) / maxAbs);
+      bg = `style="background:${pnl >= 0 ? `rgba(74,222,128,${alpha.toFixed(2)})` : `rgba(248,113,113,${alpha.toFixed(2)})`}"`;
+    }
+    const dateKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    html += `<div class="cal-day ${dayTrades.length ? 'has-trades' : ''} ${isToday ? 'today' : ''}" ${bg} ${dayTrades.length ? `onclick="setDayFilter('${dateKey}')"` : ''}>
+      <div class="dn">${day}</div>
+      ${dayTrades.length ? `<div class="pl ${pnl >= 0 ? 'up' : 'down'}">${fmtMoney(pnl)}</div><div class="cnt">${dayTrades.length} lệnh</div>` : ''}
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+function setDayFilter(dateKey) {
+  calDayFilter = dateKey;
+  document.getElementById('day-filter-label').textContent = dateKey;
+  document.getElementById('day-filter-chip').classList.add('show');
+  renderTrades();
+  document.getElementById('trades-list').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function clearDayFilter() {
+  calDayFilter = null;
+  document.getElementById('day-filter-chip').classList.remove('show');
+  renderTrades();
+}
+
+/* ============================================================ BẢN ĐỒ NHIỆT · COIN × THỨ ============================================================ */
+function renderHeatmap() {
+  const pairs = [...new Set(trades.map(t => t.pair))].sort();
+  const el = document.getElementById('heatmap-grid');
+  if (!pairs.length) { el.innerHTML = '<div class="perf-card empty">Chưa có dữ liệu</div>'; return; }
+  const weekdays = [1, 2, 3, 4, 5, 6, 0];
+  const wLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  const matrix = pairs.map(p => weekdays.map(wd => {
+    const list = trades.filter(t => t.pair === p && !isNaN(new Date(t.date)) && new Date(t.date).getDay() === wd);
+    return { n: list.length, pnl: list.reduce((s, t) => s + (t.pnl || 0), 0) };
+  }));
+  const maxAbs = Math.max(1, ...matrix.flat().map(c => Math.abs(c.pnl)));
+  let html = `<div class="hm-grid" style="grid-template-columns:90px repeat(7,minmax(52px,1fr));">`;
+  html += '<div></div>' + wLabels.map(w => `<div class="hm-head">${w}</div>`).join('');
+  pairs.forEach((p, ri) => {
+    html += `<div class="hm-row-label" title="${p}">${p}</div>`;
+    matrix[ri].forEach(c => {
+      let bg = 'transparent';
+      if (c.n) {
+        const alpha = 0.15 + 0.55 * (Math.abs(c.pnl) / maxAbs);
+        bg = c.pnl >= 0 ? `rgba(74,222,128,${alpha.toFixed(2)})` : `rgba(248,113,113,${alpha.toFixed(2)})`;
+      }
+      html += `<div class="hm-cell" style="background:${bg}" title="${c.n} lệnh">${c.n ? fmtMoneyShort(c.pnl) : ''}</div>`;
+    });
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+function fmtMoneyShort(n) {
+  const sign = n >= 0 ? '+' : '-';
+  return sign + '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+}
+
 function renderTrades() {
   const search = document.getElementById('search-input').value.toLowerCase();
   const filterResult = document.getElementById('filter-result').value;
   const filterPair = document.getElementById('filter-pair').value;
   let list = [...trades].sort((a, b) => new Date(b.date) - new Date(a.date) || b.createdAt - a.createdAt);
+  if (calDayFilter) list = list.filter(t => t.date === calDayFilter);
   if (filterResult) list = list.filter(t => t.result === filterResult);
   if (filterPair) list = list.filter(t => t.pair === filterPair);
   if (search) list = list.filter(t =>
@@ -654,9 +792,12 @@ function renderAll() {
   renderDonut();
   renderPerfByPair();
   renderPerfByWeekday();
+  renderCalendar();
+  renderHeatmap();
   renderTrades();
 }
 
+initCalendar();
 renderAll();
 pullFromServer();
 </script>
