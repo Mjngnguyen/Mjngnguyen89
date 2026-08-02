@@ -15,7 +15,7 @@ async function redisSet(data) {
   await fetch(`${REDIS_URL}/set/${KEY}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(JSON.stringify(data))
+    body: JSON.stringify(data)
   });
 }
 
