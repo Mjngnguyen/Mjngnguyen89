@@ -990,8 +990,8 @@ function renderTrendingPanel() {
   fhtTitleEl.textContent = `TOP BIẾN ĐỘNG · ${tf.label}`;
   const pool = latestCoins.slice(0, TRENDING_POOL_SIZE);
   const valid = pool.filter(c => typeof c[tf.field] === 'number');
-  const gainers = [...valid].sort((a, b) => b[tf.field] - a[tf.field]).slice(0, 5);
-  const losers = [...valid].sort((a, b) => a[tf.field] - b[tf.field]).slice(0, 5);
+  const gainers = [...valid].sort((a, b) => b[tf.field] - a[tf.field]).slice(0, 10);
+  const losers = [...valid].sort((a, b) => a[tf.field] - b[tf.field]).slice(0, 10);
   fhtListUpEl.innerHTML = gainers.map(c => trendRow(c, tf.field)).join('');
   fhtListDownEl.innerHTML = losers.map(c => trendRow(c, tf.field)).join('');
   refreshPinnedHighlight();
